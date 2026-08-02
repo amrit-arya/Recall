@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { PageContainer } from "@/components/shared/page-container";
-import { EmptyState } from "@/components/shared/empty-state";
-import { Brain } from "lucide-react";
+import { MemoriesView } from "@/components/memories/memories-view";
+import { mockMemories, mockCollections } from "@/lib/mock-data";
 
 export const metadata: Metadata = {
   title: "Memories",
@@ -11,13 +11,9 @@ export default function MemoriesPage() {
   return (
     <PageContainer
       title="Memories"
-      description="Everything you've saved"
+      description="Everything you've captured across devices"
     >
-      <EmptyState
-        icon={Brain}
-        title="No memories yet"
-        description="Start capturing URLs, notes, code snippets, and more. They'll appear here."
-      />
+      <MemoriesView initialMemories={mockMemories} collections={mockCollections} />
     </PageContainer>
   );
 }

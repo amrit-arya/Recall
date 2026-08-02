@@ -28,6 +28,7 @@ export interface Memory {
   collection?: string;
   createdAt: string; // ISO 8601
   attachmentUrl?: string;
+  sessionIds?: string[]; // sessions this memory is attached to
 }
 
 /** A Session represents a period of work */
@@ -41,6 +42,14 @@ export interface Session {
   nextStep?: string;
   status: SessionStatus;
   memoryCount: number;
+  progressNotes?: ProgressNote[];
+}
+
+/** A progress note within a session */
+export interface ProgressNote {
+  id: string;
+  content: string;
+  createdAt: string; // ISO 8601
 }
 
 /** Dashboard activity stats */
@@ -49,4 +58,24 @@ export interface ActivityStats {
   sessionsThisWeek: number;
   totalMemories: number;
   totalSessions: number;
+}
+
+/** Timeline event types */
+export type TimelineEventType =
+  | "memory_created"
+  | "session_started"
+  | "session_paused"
+  | "session_completed"
+  | "progress_note"
+  | "memory_tagged";
+
+/** A timeline event */
+export interface TimelineEvent {
+  id: string;
+  type: TimelineEventType;
+  title: string;
+  description?: string;
+  entityId: string; // memory or session id
+  entityName: string;
+  createdAt: string; // ISO 8601
 }
