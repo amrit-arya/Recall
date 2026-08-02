@@ -1,0 +1,130 @@
+@import "tailwindcss";
+
+/*
+ * RECALL — Design Tokens
+ *
+ * Using shadcn/ui CSS custom property convention with Tailwind v4's @theme.
+ * Light mode is default; dark mode via .dark class (controlled by next-themes).
+ */
+
+:root {
+  --background: oklch(0.985 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.487 0.2 275);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.965 0.002 260);
+  --secondary-foreground: oklch(0.205 0.015 260);
+  --muted: oklch(0.965 0.002 260);
+  --muted-foreground: oklch(0.556 0.01 260);
+  --accent: oklch(0.955 0.005 260);
+  --accent-foreground: oklch(0.205 0.015 260);
+  --destructive: oklch(0.577 0.245 27.33);
+  --destructive-foreground: oklch(0.985 0 0);
+  --border: oklch(0.922 0.004 260);
+  --input: oklch(0.922 0.004 260);
+  --ring: oklch(0.487 0.2 275);
+  --radius: 0.5rem;
+}
+
+.dark {
+  --background: oklch(0.1 0.005 260);
+  --foreground: oklch(0.945 0.005 260);
+  --card: oklch(0.13 0.007 260);
+  --card-foreground: oklch(0.945 0.005 260);
+  --popover: oklch(0.13 0.007 260);
+  --popover-foreground: oklch(0.945 0.005 260);
+  --primary: oklch(0.585 0.19 275);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.175 0.01 260);
+  --secondary-foreground: oklch(0.945 0.005 260);
+  --muted: oklch(0.175 0.01 260);
+  --muted-foreground: oklch(0.596 0.015 260);
+  --accent: oklch(0.195 0.012 260);
+  --accent-foreground: oklch(0.945 0.005 260);
+  --destructive: oklch(0.577 0.245 27.33);
+  --destructive-foreground: oklch(0.985 0 0);
+  --border: oklch(0.22 0.012 260);
+  --input: oklch(0.22 0.012 260);
+  --ring: oklch(0.585 0.19 275);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --font-sans: var(--font-inter);
+}
+
+/* Base styles */
+* {
+  border-color: var(--border);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Smooth transitions for theme switching */
+* {
+  transition-property: background-color, border-color;
+  transition-duration: 150ms;
+  transition-timing-function: ease;
+}
+
+/* Disable transitions on page load to prevent flash */
+html.no-transitions * {
+  transition: none !important;
+}
+
+/* Scrollbar styling for dark mode */
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) {
+    color-scheme: dark;
+  }
+}
+
+.dark {
+  color-scheme: dark;
+}
+
+/* Focus ring utility */
+*:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+/* Backdrop filter support check */
+@supports (backdrop-filter: blur(1px)) {
+  .supports-backdrop-filter\:bg-card\/80 {
+    background-color: oklch(from var(--card) l c h / 0.8);
+  }
+}
