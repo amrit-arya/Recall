@@ -2,24 +2,11 @@ import Link from "next/link";
 import { ArrowRight, Paperclip } from "lucide-react";
 import type { Session } from "@/types";
 import { cn, formatRelativeTime } from "@/lib/utils";
+import { StatusDot } from "@/components/shared/session-status-badge";
 
 interface SessionCardProps {
   session: Session;
   className?: string;
-}
-
-function StatusDot({ status }: { status: Session["status"] }) {
-  return (
-    <span
-      className={cn(
-        "inline-block h-2 w-2 rounded-full",
-        status === "active" && "bg-emerald-500 animate-pulse",
-        status === "paused" && "bg-amber-500",
-        status === "completed" && "bg-muted-foreground"
-      )}
-      aria-label={status}
-    />
-  );
 }
 
 export function SessionCard({ session, className }: SessionCardProps) {

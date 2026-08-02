@@ -1,14 +1,16 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { PageContainer } from "@/components/shared/page-container";
-import { mockTimelineEvents } from "@/lib/mock-data";
+import { getTimelineEvents } from "@/lib/data";
 import { formatRelativeTime } from "@/lib/utils";
-import { Brain, Play, Pause, CheckCircle2, FileText, Tag, Clock } from "lucide-react";
+import { Brain, Play, Pause, CheckCircle2, FileText, Tag } from "lucide-react";
 import type { TimelineEventType } from "@/types";
 
 export const metadata: Metadata = {
   title: "Timeline",
 };
+
+export const dynamic = "force-dynamic";
 
 function getEventIcon(type: TimelineEventType) {
   switch (type) {
@@ -24,18 +26,33 @@ function getEventIcon(type: TimelineEventType) {
       return <FileText className="h-4 w-4 text-purple-500" />;
     case "memory_tagged":
       return <Tag className="h-4 w-4 text-indigo-500" />;
-    default:
-      return <Clock className="h-4 w-4 text-muted-foreground" />;
+    default: {
+      const _exhaustive: never = type;
+      throw new Error(`Unhandled timeline event type: ${_exhaustive}`);
+    }
   }
 }
 
 function getEntityLink(type: TimelineEventType, id: string) {
-  if (type.startsWith("memory")) return `/memories/${id}`;
-  if (type.startsWith("session") || type === "progress_note") return `/sessions/${id}`;
-  return "#";
+  switch (type) {
+    case "memory_created":
+    case "memory_tagged":
+      return `/memories/${id}`;
+    case "session_started":
+    case "session_paused":
+    case "session_completed":
+    case "progress_note":
+      return `/sessions/${id}`;
+    default: {
+      const _exhaustive: never = type;
+      throw new Error(`Unhandled timeline event type: ${_exhaustive}`);
+    }
+  }
 }
 
-export default function TimelinePage() {
+export default async function TimelinePage() {
+  const events = await getTimelineEvents();
+
   return (
     <PageContainer
       title="Timeline"
@@ -43,7 +60,7 @@ export default function TimelinePage() {
     >
       <div className="max-w-3xl space-y-6">
         <div className="relative pl-6 space-y-8 before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-border">
-          {mockTimelineEvents.map((event) => (
+          {events.map((event) => (
             <div key={event.id} className="relative flex items-start gap-4 group">
               {/* Event Icon Node */}
               <div className="absolute -left-6 top-0 flex h-6 w-6 items-center justify-center rounded-full border border-border bg-card shadow-xs group-hover:border-primary transition-colors">

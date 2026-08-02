@@ -1,13 +1,13 @@
-"use client";
-
-import { useTheme } from "next-themes";
+import type { Metadata } from "next";
 import { PageContainer } from "@/components/shared/page-container";
-import { User, Moon, Sun, Sparkles, Database, Shield, Monitor } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { User, Sun, Sparkles, Database, Shield } from "lucide-react";
+import { ThemeToggle } from "@/components/providers/theme-toggle";
+
+export const metadata: Metadata = {
+  title: "Settings",
+};
 
 export default function SettingsPage() {
-  const { theme, setTheme } = useTheme();
-
   return (
     <PageContainer
       title="Settings"
@@ -40,47 +40,7 @@ export default function SettingsPage() {
           <p className="text-xs text-muted-foreground">
             Customize how RECALL looks across your devices.
           </p>
-          <div className="grid grid-cols-3 gap-3 max-w-md">
-            <button
-              type="button"
-              onClick={() => setTheme("light")}
-              className={cn(
-                "flex flex-col items-center gap-2 rounded-xl border p-3 text-xs font-medium transition-all",
-                theme === "light"
-                  ? "border-primary bg-primary/5 text-primary"
-                  : "border-border bg-card text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <Sun className="h-5 w-5" />
-              <span>Light</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setTheme("dark")}
-              className={cn(
-                "flex flex-col items-center gap-2 rounded-xl border p-3 text-xs font-medium transition-all",
-                theme === "dark"
-                  ? "border-primary bg-primary/5 text-primary"
-                  : "border-border bg-card text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <Moon className="h-5 w-5" />
-              <span>Dark</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setTheme("system")}
-              className={cn(
-                "flex flex-col items-center gap-2 rounded-xl border p-3 text-xs font-medium transition-all",
-                theme === "system"
-                  ? "border-primary bg-primary/5 text-primary"
-                  : "border-border bg-card text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <Monitor className="h-5 w-5" />
-              <span>System</span>
-            </button>
-          </div>
+          <ThemeToggle variant="segmented" />
         </div>
 
         {/* Section 3: AI Preferences Placeholder */}
@@ -128,10 +88,10 @@ export default function SettingsPage() {
         <div className="rounded-xl border border-border bg-card p-6 space-y-2">
           <div className="flex items-center gap-2">
             <Shield className="h-4 w-4 text-emerald-500" />
-            <span className="text-xs font-medium text-foreground">Row Level Security Active</span>
+            <span className="text-xs font-medium text-foreground">Row Level Security Prepared</span>
           </div>
           <p className="text-[11px] text-muted-foreground">
-            Your memory database is isolated with PostgreSQL RLS policies matching your account ownership.
+            Database architecture configured with PostgreSQL RLS policies ready for backend integration.
           </p>
         </div>
       </div>

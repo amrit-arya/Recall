@@ -16,8 +16,8 @@ export function AppShell({ children }: AppShellProps) {
       <div className="flex flex-1 flex-col md:pl-60">
         <Header />
 
-        {/* Page content — bottom padding on mobile for nav bar */}
-        <main className="flex-1 pb-16 md:pb-0">{children}</main>
+        {/* Page content — generous bottom padding on mobile for nav bar + safe-area insets */}
+        <main className="flex-1 pb-20 md:pb-0">{children}</main>
       </div>
 
       {/* Mobile bottom nav */}

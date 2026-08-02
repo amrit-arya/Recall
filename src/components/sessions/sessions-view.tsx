@@ -6,6 +6,7 @@ import type { Session, SessionStatus } from "@/types";
 import { SessionCard } from "@/components/sessions/session-card";
 import { EmptyState } from "@/components/shared/empty-state";
 import { cn } from "@/lib/utils";
+import { sessionStatusConfig } from "@/components/shared/session-status-badge";
 
 interface SessionsViewProps {
   initialSessions: Session[];
@@ -28,9 +29,15 @@ export function SessionsView({ initialSessions }: SessionsViewProps) {
       {/* Header Bar: Filter Tabs & New Session Button */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         {/* Status Tabs */}
-        <div className="flex items-center gap-1.5 rounded-xl border border-border bg-card p-1">
+        <div
+          role="tablist"
+          aria-label="Filter sessions by status"
+          className="flex items-center gap-1.5 rounded-xl border border-border bg-card p-1"
+        >
           <button
             type="button"
+            role="tab"
+            aria-selected={activeTab === "all"}
             onClick={() => setActiveTab("all")}
             className={cn(
               "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
@@ -41,8 +48,11 @@ export function SessionsView({ initialSessions }: SessionsViewProps) {
           >
             <span>All ({initialSessions.length})</span>
           </button>
+
           <button
             type="button"
+            role="tab"
+            aria-selected={activeTab === "active"}
             onClick={() => setActiveTab("active")}
             className={cn(
               "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
@@ -51,11 +61,14 @@ export function SessionsView({ initialSessions }: SessionsViewProps) {
                 : "text-muted-foreground hover:text-foreground"
             )}
           >
-            <PlayCircle className="h-3.5 w-3.5 text-emerald-500" />
+            <PlayCircle className={cn("h-3.5 w-3.5", sessionStatusConfig.active.badgeText)} />
             <span>Active ({activeSessions.length})</span>
           </button>
+
           <button
             type="button"
+            role="tab"
+            aria-selected={activeTab === "paused"}
             onClick={() => setActiveTab("paused")}
             className={cn(
               "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
@@ -64,11 +77,14 @@ export function SessionsView({ initialSessions }: SessionsViewProps) {
                 : "text-muted-foreground hover:text-foreground"
             )}
           >
-            <PauseCircle className="h-3.5 w-3.5 text-amber-500" />
+            <PauseCircle className={cn("h-3.5 w-3.5", sessionStatusConfig.paused.badgeText)} />
             <span>Paused ({pausedSessions.length})</span>
           </button>
+
           <button
             type="button"
+            role="tab"
+            aria-selected={activeTab === "completed"}
             onClick={() => setActiveTab("completed")}
             className={cn(
               "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
@@ -77,7 +93,7 @@ export function SessionsView({ initialSessions }: SessionsViewProps) {
                 : "text-muted-foreground hover:text-foreground"
             )}
           >
-            <CheckCircle2 className="h-3.5 w-3.5 text-muted-foreground" />
+            <CheckCircle2 className={cn("h-3.5 w-3.5", sessionStatusConfig.completed.badgeText)} />
             <span>Finished ({completedSessions.length})</span>
           </button>
         </div>

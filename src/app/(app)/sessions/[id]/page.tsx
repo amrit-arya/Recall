@@ -3,18 +3,15 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
   ArrowLeft,
-  Play,
-  Pause,
-  Check,
   Plus,
   Paperclip,
   Clock,
   CheckCircle2,
 } from "lucide-react";
-import { mockSessions, mockMemories } from "@/lib/mock-data";
+import { getSessionById, getMemories } from "@/lib/data";
 import { formatRelativeTime } from "@/lib/utils";
 import { MemoryCard } from "@/components/memories/memory-card";
-import { SessionControls } from "@/components/sessions/session-controls";
+import { SessionDetailHeader } from "@/components/sessions/session-detail-header";
 
 interface SessionDetailPageProps {
   params: Promise<{ id: string }>;
@@ -22,7 +19,7 @@ interface SessionDetailPageProps {
 
 export async function generateMetadata({ params }: SessionDetailPageProps): Promise<Metadata> {
   const { id } = await params;
-  const session = mockSessions.find((s) => s.id === id);
+  const session = await getSessionById(id);
   return {
     title: session ? session.name : "Session Detail",
   };
@@ -30,14 +27,15 @@ export async function generateMetadata({ params }: SessionDetailPageProps): Prom
 
 export default async function SessionDetailPage({ params }: SessionDetailPageProps) {
   const { id } = await params;
-  const session = mockSessions.find((s) => s.id === id);
+  const session = await getSessionById(id);
 
   if (!session) {
     notFound();
   }
 
-  // Find memories attached to this session
-  const attachedMemories = mockMemories.filter((m) =>
+  // Find memories attached to this session via Data Access Layer
+  const allMemories = await getMemories();
+  const attachedMemories = allMemories.filter((m) =>
     m.sessionIds?.includes(session.id)
   );
 
@@ -55,41 +53,8 @@ export default async function SessionDetailPage({ params }: SessionDetailPagePro
           </Link>
         </div>
 
-        {/* Header Block */}
-        <div className="rounded-xl border border-border bg-card p-6 space-y-4">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <span
-                  className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                    session.status === "active"
-                      ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                      : session.status === "paused"
-                      ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
-                      : "bg-muted text-muted-foreground"
-                  }`}
-                >
-                  {session.status === "active" && <Play className="h-3 w-3 fill-current" />}
-                  {session.status === "paused" && <Pause className="h-3 w-3 fill-current" />}
-                  {session.status === "completed" && <Check className="h-3 w-3" />}
-                  <span className="capitalize">{session.status}</span>
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  Started {formatRelativeTime(session.startTime)}
-                </span>
-              </div>
-              <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-foreground">
-                {session.name}
-              </h1>
-              {session.description && (
-                <p className="text-sm text-muted-foreground">{session.description}</p>
-              )}
-            </div>
-
-            {/* Interactive Session Controls component */}
-            <SessionControls initialStatus={session.status} />
-          </div>
-        </div>
+        {/* Synchronized Header Block */}
+        <SessionDetailHeader session={session} />
 
         {/* Current Context: Progress & Next Step */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

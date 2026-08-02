@@ -7,24 +7,40 @@ import { RecentMemories } from "@/components/dashboard/recent-memories";
 import { RecentSessions } from "@/components/dashboard/recent-sessions";
 import { ActivityOverview } from "@/components/dashboard/activity-overview";
 import {
-  mockRecentMemories,
-  mockActiveSessions,
-  mockRecentSessions,
-  mockActivityStats,
-  mockInboxCount,
-} from "@/lib/mock-data";
+  getRecentMemories,
+  getActiveSessions,
+  getRecentSessions,
+  getActivityStats,
+  getInboxCount,
+} from "@/lib/data";
 
 export const metadata: Metadata = {
   title: "Home",
 };
 
-export default function DashboardPage() {
+export const dynamic = "force-dynamic";
+
+export default async function DashboardPage() {
+  const [
+    recentMemories,
+    activeSessions,
+    recentSessions,
+    activityStats,
+    inboxCount,
+  ] = await Promise.all([
+    getRecentMemories(6),
+    getActiveSessions(),
+    getRecentSessions(5),
+    getActivityStats(),
+    getInboxCount(),
+  ]);
+
   return (
     <div className="flex-1 overflow-y-auto">
       <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
         {/* Greeting + Quick Capture */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between mb-6">
-          <Greeting inboxCount={mockInboxCount} />
+          <Greeting inboxCount={inboxCount} />
           <QuickCaptureButton />
         </div>
 
@@ -38,19 +54,19 @@ export default function DashboardPage() {
           {/* Left column: main content */}
           <div className="space-y-8">
             {/* Continue Working */}
-            <ContinueWorking sessions={mockActiveSessions} />
+            <ContinueWorking sessions={activeSessions} />
 
             {/* Recent Memories */}
-            <RecentMemories memories={mockRecentMemories} />
+            <RecentMemories memories={recentMemories} />
           </div>
 
           {/* Right column: sidebar content (desktop) / stacked below (mobile) */}
           <div className="space-y-8">
             {/* Activity Overview */}
-            <ActivityOverview stats={mockActivityStats} />
+            <ActivityOverview stats={activityStats} />
 
             {/* Recent Sessions */}
-            <RecentSessions sessions={mockRecentSessions} />
+            <RecentSessions sessions={recentSessions} />
           </div>
         </div>
       </div>

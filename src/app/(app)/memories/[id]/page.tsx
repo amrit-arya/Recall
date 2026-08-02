@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import Image from "next/image";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ExternalLink, Calendar, Folder, Tag, Paperclip, Sparkles } from "lucide-react";
-import { mockMemories, mockSessions } from "@/lib/mock-data";
+import { getMemoryById, getSessions } from "@/lib/data";
 import { MemoryTypeIcon, MemoryTypeBadge } from "@/components/shared/memory-type-icon";
 import { formatRelativeTime, extractDomain } from "@/lib/utils";
 import { SessionCard } from "@/components/sessions/session-card";
@@ -13,7 +14,7 @@ interface MemoryDetailPageProps {
 
 export async function generateMetadata({ params }: MemoryDetailPageProps): Promise<Metadata> {
   const { id } = await params;
-  const memory = mockMemories.find((m) => m.id === id);
+  const memory = await getMemoryById(id);
   return {
     title: memory ? memory.title : "Memory Detail",
   };
@@ -21,14 +22,15 @@ export async function generateMetadata({ params }: MemoryDetailPageProps): Promi
 
 export default async function MemoryDetailPage({ params }: MemoryDetailPageProps) {
   const { id } = await params;
-  const memory = mockMemories.find((m) => m.id === id);
+  const memory = await getMemoryById(id);
 
   if (!memory) {
     notFound();
   }
 
-  // Associated sessions
-  const associatedSessions = mockSessions.filter((s) =>
+  // Associated sessions via Data Access Layer
+  const allSessions = await getSessions();
+  const associatedSessions = allSessions.filter((s) =>
     memory.sessionIds?.includes(s.id)
   );
 
@@ -131,12 +133,13 @@ export default async function MemoryDetailPage({ params }: MemoryDetailPageProps
           <div className="rounded-xl border border-border bg-card p-6 space-y-3">
             <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Attachment</h2>
             {memory.type === "image" || memory.type === "screenshot" ? (
-              <div className="overflow-hidden rounded-lg border border-border">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
+              <div className="overflow-hidden rounded-lg border border-border relative h-96 w-full">
+                <Image
                   src={memory.attachmentUrl}
                   alt={memory.title}
-                  className="max-h-96 w-full object-cover"
+                  fill
+                  className="object-cover"
+                  sizes="(max-width: 768px) 100vw, 800px"
                 />
               </div>
             ) : (

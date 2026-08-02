@@ -1,19 +1,23 @@
 import type { Metadata } from "next";
 import { PageContainer } from "@/components/shared/page-container";
 import { SessionsView } from "@/components/sessions/sessions-view";
-import { mockSessions } from "@/lib/mock-data";
+import { getSessions } from "@/lib/data";
 
 export const metadata: Metadata = {
   title: "Sessions",
 };
 
-export default function SessionsPage() {
+export const dynamic = "force-dynamic";
+
+export default async function SessionsPage() {
+  const sessions = await getSessions();
+
   return (
     <PageContainer
       title="Sessions"
       description="Organize your active, paused, and completed work periods"
     >
-      <SessionsView initialSessions={mockSessions} />
+      <SessionsView initialSessions={sessions} />
     </PageContainer>
   );
 }

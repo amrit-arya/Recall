@@ -2,16 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Brain, Clock, History, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-const navigation = [
-  { name: "Home", href: "/dashboard", icon: Home },
-  { name: "Memories", href: "/memories", icon: Brain },
-  { name: "Sessions", href: "/sessions", icon: Clock },
-  { name: "Timeline", href: "/timeline", icon: History },
-  { name: "Settings", href: "/settings", icon: Settings },
-];
+import { NAV_ITEMS, isNavActive } from "@/lib/navigation";
 
 export function MobileNav() {
   const pathname = usePathname();
@@ -22,10 +14,8 @@ export function MobileNav() {
         className="flex w-full justify-around"
         style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
       >
-        {navigation.map((item) => {
-          const isActive =
-            pathname === item.href ||
-            (item.href !== "/dashboard" && pathname.startsWith(item.href));
+        {NAV_ITEMS.map((item) => {
+          const active = isNavActive(pathname, item.href);
 
           return (
             <Link
@@ -33,7 +23,7 @@ export function MobileNav() {
               href={item.href}
               className={cn(
                 "flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px] font-medium transition-colors",
-                isActive
+                active
                   ? "text-indigo-600 dark:text-indigo-400"
                   : "text-muted-foreground"
               )}

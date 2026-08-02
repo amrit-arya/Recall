@@ -61,6 +61,7 @@ export function MemoriesView({ initialMemories, collections }: MemoriesViewProps
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search title, content, or tags..."
+            aria-label="Search memories by title, content, or tags"
             className="h-10 w-full rounded-lg border border-input bg-card pl-9 pr-4 text-sm placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
           />
         </div>
@@ -71,6 +72,7 @@ export function MemoriesView({ initialMemories, collections }: MemoriesViewProps
             <button
               type="button"
               onClick={() => setViewMode("grid")}
+              aria-pressed={viewMode === "grid"}
               className={cn(
                 "rounded p-1.5 text-muted-foreground hover:text-foreground transition-colors",
                 viewMode === "grid" && "bg-accent text-foreground"
@@ -82,6 +84,7 @@ export function MemoriesView({ initialMemories, collections }: MemoriesViewProps
             <button
               type="button"
               onClick={() => setViewMode("list")}
+              aria-pressed={viewMode === "list"}
               className={cn(
                 "rounded p-1.5 text-muted-foreground hover:text-foreground transition-colors",
                 viewMode === "list" && "bg-accent text-foreground"
@@ -115,6 +118,7 @@ export function MemoriesView({ initialMemories, collections }: MemoriesViewProps
             <button
               key={t.value}
               type="button"
+              aria-pressed={selectedType === t.value}
               onClick={() => setSelectedType(t.value)}
               className={cn(
                 "rounded-full px-3 py-1 text-xs font-medium transition-colors border",
@@ -133,6 +137,7 @@ export function MemoriesView({ initialMemories, collections }: MemoriesViewProps
           <select
             value={selectedCollection}
             onChange={(e) => setSelectedCollection(e.target.value)}
+            aria-label="Filter memories by collection"
             className="ml-auto h-8 rounded-lg border border-border bg-card px-2.5 text-xs text-foreground focus:outline-none"
           >
             <option value="all">All Collections</option>
