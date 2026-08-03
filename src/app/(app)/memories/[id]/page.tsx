@@ -2,11 +2,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
 import { notFound } from "next/navigation";
-import { ArrowLeft, ExternalLink, Calendar, Folder, Tag, Paperclip, Sparkles } from "lucide-react";
+import { ArrowLeft, Calendar, Folder, Tag, Paperclip, Sparkles } from "lucide-react";
 import { getMemoryById, getSessions } from "@/lib/data";
 import { MemoryTypeIcon, MemoryTypeBadge } from "@/components/shared/memory-type-icon";
 import { formatRelativeTime, extractDomain } from "@/lib/utils";
 import { SessionCard } from "@/components/sessions/session-card";
+import { MemoryDetailActions } from "@/components/memories/memory-detail-actions";
 
 interface MemoryDetailPageProps {
   params: Promise<{ id: string }>;
@@ -19,6 +20,8 @@ export async function generateMetadata({ params }: MemoryDetailPageProps): Promi
     title: memory ? memory.title : "Memory Detail",
   };
 }
+
+export const dynamic = "force-dynamic";
 
 export default async function MemoryDetailPage({ params }: MemoryDetailPageProps) {
   const { id } = await params;
@@ -48,10 +51,10 @@ export default async function MemoryDetailPage({ params }: MemoryDetailPageProps
           </Link>
         </div>
 
-        {/* Header Header */}
+        {/* Memory Header Card */}
         <div className="rounded-xl border border-border bg-card p-6 space-y-4">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex items-center gap-3">
+          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+            <div className="flex items-start gap-3">
               <MemoryTypeIcon type={memory.type} size="md" />
               <div>
                 <div className="flex items-center gap-2">
@@ -68,17 +71,9 @@ export default async function MemoryDetailPage({ params }: MemoryDetailPageProps
                 </h1>
               </div>
             </div>
-            {memory.url && (
-              <a
-                href={memory.url}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-accent transition-colors"
-              >
-                <span>Visit URL</span>
-                <ExternalLink className="h-3.5 w-3.5" />
-              </a>
-            )}
+
+            {/* Edit / Delete / Visit Actions */}
+            <MemoryDetailActions memory={memory} />
           </div>
 
           {/* Description */}

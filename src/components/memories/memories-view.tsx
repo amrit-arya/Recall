@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { Search, Plus, Filter, LayoutGrid, List } from "lucide-react";
 import type { Memory, MemoryType } from "@/types";
 import { MemoryCard } from "@/components/memories/memory-card";
+import { MemoryModal } from "@/components/memories/memory-modal";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Brain } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -29,6 +30,7 @@ export function MemoriesView({ initialMemories, collections }: MemoriesViewProps
   const [selectedType, setSelectedType] = useState<MemoryType | "all">("all");
   const [selectedCollection, setSelectedCollection] = useState<string>("all");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const filteredMemories = useMemo(() => {
     return initialMemories.filter((mem) => {
@@ -48,6 +50,8 @@ export function MemoriesView({ initialMemories, collections }: MemoriesViewProps
       return true;
     });
   }, [initialMemories, searchQuery, selectedType, selectedCollection]);
+
+  const hasNoMemoriesAtAll = initialMemories.length === 0;
 
   return (
     <div className="space-y-6">
@@ -74,7 +78,7 @@ export function MemoriesView({ initialMemories, collections }: MemoriesViewProps
               onClick={() => setViewMode("grid")}
               aria-pressed={viewMode === "grid"}
               className={cn(
-                "rounded p-1.5 text-muted-foreground hover:text-foreground transition-colors",
+                "rounded p-1.5 text-muted-foreground hover:text-foreground transition-colors cursor-pointer",
                 viewMode === "grid" && "bg-accent text-foreground"
               )}
               aria-label="Grid view"
@@ -86,7 +90,7 @@ export function MemoriesView({ initialMemories, collections }: MemoriesViewProps
               onClick={() => setViewMode("list")}
               aria-pressed={viewMode === "list"}
               className={cn(
-                "rounded p-1.5 text-muted-foreground hover:text-foreground transition-colors",
+                "rounded p-1.5 text-muted-foreground hover:text-foreground transition-colors cursor-pointer",
                 viewMode === "list" && "bg-accent text-foreground"
               )}
               aria-label="List view"
@@ -97,7 +101,8 @@ export function MemoriesView({ initialMemories, collections }: MemoriesViewProps
 
           <button
             type="button"
-            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+            onClick={() => setIsModalOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors cursor-pointer"
           >
             <Plus className="h-4 w-4" />
             <span>New Memory</span>
@@ -121,7 +126,7 @@ export function MemoriesView({ initialMemories, collections }: MemoriesViewProps
               aria-pressed={selectedType === t.value}
               onClick={() => setSelectedType(t.value)}
               className={cn(
-                "rounded-full px-3 py-1 text-xs font-medium transition-colors border",
+                "rounded-full px-3 py-1 text-xs font-medium transition-colors border cursor-pointer",
                 selectedType === t.value
                   ? "bg-primary text-primary-foreground border-primary"
                   : "bg-card text-muted-foreground border-border hover:border-ring/40 hover:text-foreground"
@@ -138,7 +143,7 @@ export function MemoriesView({ initialMemories, collections }: MemoriesViewProps
             value={selectedCollection}
             onChange={(e) => setSelectedCollection(e.target.value)}
             aria-label="Filter memories by collection"
-            className="ml-auto h-8 rounded-lg border border-border bg-card px-2.5 text-xs text-foreground focus:outline-none"
+            className="ml-auto h-8 rounded-lg border border-border bg-card px-2.5 text-xs text-foreground focus:outline-none cursor-pointer"
           >
             <option value="all">All Collections</option>
             {collections.map((col) => (
@@ -151,7 +156,23 @@ export function MemoriesView({ initialMemories, collections }: MemoriesViewProps
       </div>
 
       {/* Content */}
-      {filteredMemories.length === 0 ? (
+      {hasNoMemoriesAtAll ? (
+        <EmptyState
+          icon={Brain}
+          title="No memories captured yet"
+          description="Start building your digital memory repository by capturing URLs, notes, snippets, or code."
+          action={
+            <button
+              type="button"
+              onClick={() => setIsModalOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors cursor-pointer"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Capture Your First Memory</span>
+            </button>
+          }
+        />
+      ) : filteredMemories.length === 0 ? (
         <EmptyState
           icon={Brain}
           title="No memories match your filters"
@@ -165,7 +186,7 @@ export function MemoriesView({ initialMemories, collections }: MemoriesViewProps
                   setSelectedType("all");
                   setSelectedCollection("all");
                 }}
-                className="text-xs font-medium text-primary hover:underline"
+                className="text-xs font-medium text-primary hover:underline cursor-pointer"
               >
                 Reset all filters
               </button>
@@ -185,6 +206,12 @@ export function MemoriesView({ initialMemories, collections }: MemoriesViewProps
           ))}
         </div>
       )}
+
+      {/* New Memory Modal */}
+      <MemoryModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+      />
     </div>
   );
 }
