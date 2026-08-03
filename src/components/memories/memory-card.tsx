@@ -9,16 +9,17 @@ import {
 interface MemoryCardProps {
   memory: Memory;
   className?: string;
+  onTagClick?: (tag: string) => void;
 }
 
-export function MemoryCard({ memory, className }: MemoryCardProps) {
+export function MemoryCard({ memory, className, onTagClick }: MemoryCardProps) {
   const snippet = getSnippet(memory);
 
   return (
     <Link
       href={`/memories/${memory.id}`}
       className={cn(
-        "group block rounded-xl border border-border bg-card p-4 transition-colors hover:border-ring/30",
+        "group block rounded-xl border border-border bg-card p-4 transition-all hover:border-ring/30 hover:shadow-sm",
         className
       )}
     >
@@ -50,20 +51,37 @@ export function MemoryCard({ memory, className }: MemoryCardProps) {
         </p>
       )}
 
-      {/* Footer: tags + time */}
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5 min-w-0">
-          {memory.tags.slice(0, 2).map((tag) => (
-            <span
-              key={tag}
-              className="inline-flex items-center rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
-            >
-              {tag}
+      {/* Footer: collection + tags + time */}
+      <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-border/40">
+        <div className="flex flex-wrap items-center gap-1.5 min-w-0">
+          {memory.collection && (
+            <span className="inline-flex items-center rounded-md bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+              📁 {memory.collection}
             </span>
+          )}
+
+          {memory.tags.slice(0, 3).map((tag) => (
+            <button
+              key={tag}
+              type="button"
+              onClick={(e) => {
+                if (onTagClick) {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onTagClick(tag);
+                }
+              }}
+              className={cn(
+                "inline-flex items-center rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground transition-colors",
+                onTagClick && "hover:bg-accent hover:text-foreground cursor-pointer"
+              )}
+            >
+              #{tag}
+            </button>
           ))}
-          {memory.tags.length > 2 && (
+          {memory.tags.length > 3 && (
             <span className="text-[10px] text-muted-foreground">
-              +{memory.tags.length - 2}
+              +{memory.tags.length - 3}
             </span>
           )}
         </div>

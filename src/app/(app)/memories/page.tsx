@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { PageContainer } from "@/components/shared/page-container";
 import { MemoriesView } from "@/components/memories/memories-view";
-import { getMemories, getCollections } from "@/lib/data";
+import { getMemories, getCollections, getTags } from "@/lib/data";
 
 export const metadata: Metadata = {
   title: "Memories",
@@ -10,9 +10,10 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function MemoriesPage() {
-  const [memories, collections] = await Promise.all([
+  const [memories, collections, allTags] = await Promise.all([
     getMemories(),
     getCollections(),
+    getTags(),
   ]);
 
   return (
@@ -20,7 +21,11 @@ export default async function MemoriesPage() {
       title="Memories"
       description="Everything you've captured across devices"
     >
-      <MemoriesView initialMemories={memories} collections={collections} />
+      <MemoriesView
+        initialMemories={memories}
+        collections={collections}
+        allTags={allTags}
+      />
     </PageContainer>
   );
 }
