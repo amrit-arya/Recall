@@ -4,7 +4,8 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Memory, MemoryType } from '@/types'
 import { createMemoryAction, updateMemoryAction, type MemoryInput } from '@/lib/actions/memories'
-import { X, Loader2, Link as LinkIcon, FileText, Code, AlignLeft, Sparkles } from 'lucide-react'
+import { getUrlMetadataAction } from '@/lib/actions/url-metadata'
+import { X, Loader2, Link as LinkIcon, FileText, Code, AlignLeft, Sparkles, Globe, ArrowDownLeft } from 'lucide-react'
 
 interface MemoryModalProps {
   isOpen: boolean
@@ -43,6 +44,57 @@ function MemoryModalForm({
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // URL Metadata state
+  const [fetchingMetadata, setFetchingMetadata] = useState(false)
+  const [metadataNotice, setMetadataNotice] = useState<string | null>(null)
+  const [fetchedMetadata, setFetchedMetadata] = useState<{
+    title?: string
+    description?: string
+    domain?: string
+    faviconUrl?: string
+  } | null>(null)
+
+  async function fetchMetadata(targetUrl: string, autoFill: boolean = false) {
+    if (!targetUrl || !targetUrl.trim()) return
+
+    setFetchingMetadata(true)
+    setMetadataNotice(null)
+
+    try {
+      const res = await getUrlMetadataAction(targetUrl.trim())
+      setFetchingMetadata(false)
+
+      if (res.success && res.metadata) {
+        setFetchedMetadata(res.metadata)
+
+        // Prefill fields if requested or empty
+        if (res.metadata.title && (!title.trim() || autoFill)) {
+          setTitle(res.metadata.title)
+        }
+        if (res.metadata.description && (!description.trim() || autoFill)) {
+          setDescription(res.metadata.description)
+        }
+
+        setMetadataNotice(
+          res.metadata.title
+            ? `Extracted metadata from ${res.metadata.domain}`
+            : `Detected domain: ${res.metadata.domain}`
+        )
+      } else {
+        setMetadataNotice(res.error || 'Could not auto-fetch metadata. You can enter details manually.')
+      }
+    } catch {
+      setFetchingMetadata(false)
+      setMetadataNotice('Could not auto-fetch metadata. You can enter details manually.')
+    }
+  }
+
+  function handleUrlBlur() {
+    if (type === 'url' && url.trim() && !fetchedMetadata && !fetchingMetadata) {
+      fetchMetadata(url, true)
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -146,11 +198,71 @@ function MemoryModalForm({
           </div>
         </div>
 
+        {/* URL Input (shown if type === 'url' or optional) */}
+        {(type === 'url' || url) && (
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <label htmlFor="memory-url" className="text-xs font-medium text-foreground">
+                URL {type === 'url' ? '*' : '(Optional)'}
+              </label>
+              {url.trim() && (
+                <button
+                  type="button"
+                  onClick={() => fetchMetadata(url, true)}
+                  disabled={fetchingMetadata || loading}
+                  className="inline-flex items-center gap-1 text-[11px] font-medium text-primary hover:underline disabled:opacity-50 cursor-pointer"
+                >
+                  {fetchingMetadata ? (
+                    <>
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      <span>Fetching...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Globe className="h-3 w-3" />
+                      <span>Auto-fetch metadata</span>
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
+            <input
+              id="memory-url"
+              type="text"
+              required={type === 'url'}
+              placeholder="https://example.com/article"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              onBlur={handleUrlBlur}
+              disabled={loading}
+              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50"
+            />
+            {metadataNotice && (
+              <p className="text-[11px] text-muted-foreground flex items-center gap-1 mt-1">
+                <Globe className="h-3 w-3 text-primary shrink-0" />
+                <span>{metadataNotice}</span>
+              </p>
+            )}
+          </div>
+        )}
+
         {/* Title */}
         <div className="space-y-1.5">
-          <label htmlFor="memory-title" className="text-xs font-medium text-foreground">
-            Title *
-          </label>
+          <div className="flex items-center justify-between">
+            <label htmlFor="memory-title" className="text-xs font-medium text-foreground">
+              Title *
+            </label>
+            {fetchedMetadata?.title && title !== fetchedMetadata.title && (
+              <button
+                type="button"
+                onClick={() => setTitle(fetchedMetadata.title || '')}
+                className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground hover:underline cursor-pointer"
+              >
+                <ArrowDownLeft className="h-3 w-3" />
+                <span>Use generated title</span>
+              </button>
+            )}
+          </div>
           <input
             id="memory-title"
             type="text"
@@ -162,25 +274,6 @@ function MemoryModalForm({
             className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50"
           />
         </div>
-
-        {/* URL (shown if type === 'url' or optional) */}
-        {(type === 'url' || url) && (
-          <div className="space-y-1.5">
-            <label htmlFor="memory-url" className="text-xs font-medium text-foreground">
-              URL {type === 'url' ? '*' : '(Optional)'}
-            </label>
-            <input
-              id="memory-url"
-              type="text"
-              required={type === 'url'}
-              placeholder="https://example.com/article"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              disabled={loading}
-              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50"
-            />
-          </div>
-        )}
 
         {/* Content */}
         <div className="space-y-1.5">
