@@ -1,13 +1,33 @@
 import type { Metadata } from "next";
 import { PageContainer } from "@/components/shared/page-container";
-import { User, Sun, Sparkles, Database, Shield } from "lucide-react";
+import { User as UserIcon, Sun, Sparkles, Database, Shield } from "lucide-react";
 import { ThemeToggle } from "@/components/providers/theme-toggle";
+import { getCurrentUser, getCurrentProfile } from "@/lib/supabase/auth";
+import { SignOutButton } from "@/components/auth/sign-out-button";
 
 export const metadata: Metadata = {
   title: "Settings",
 };
 
-export default function SettingsPage() {
+export const dynamic = "force-dynamic";
+
+export default async function SettingsPage() {
+  const user = await getCurrentUser();
+  const profile = await getCurrentProfile();
+
+  const email = user?.email ?? "Not authenticated";
+  const displayName =
+    profile?.display_name ||
+    user?.user_metadata?.display_name ||
+    (email.includes("@") ? email.split("@")[0] : "User");
+
+  const initials = displayName
+    .split(" ")
+    .map((n: string) => n[0])
+    .join("")
+    .substring(0, 2)
+    .toUpperCase();
+
   return (
     <PageContainer
       title="Settings"
@@ -16,17 +36,20 @@ export default function SettingsPage() {
       <div className="max-w-3xl space-y-6">
         {/* Section 1: Profile */}
         <div className="rounded-xl border border-border bg-card p-6 space-y-4">
-          <div className="flex items-center gap-2 border-b border-border pb-3">
-            <User className="h-4 w-4 text-primary" />
-            <h2 className="text-sm font-semibold text-foreground">User Profile</h2>
+          <div className="flex items-center justify-between border-b border-border pb-3">
+            <div className="flex items-center gap-2">
+              <UserIcon className="h-4 w-4 text-primary" />
+              <h2 className="text-sm font-semibold text-foreground">User Profile</h2>
+            </div>
+            <SignOutButton showText={true} />
           </div>
           <div className="flex items-center gap-4">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary text-base font-bold">
-              RA
+              {initials}
             </div>
             <div>
-              <p className="text-sm font-medium text-foreground">Recall User</p>
-              <p className="text-xs text-muted-foreground">user@recall.app</p>
+              <p className="text-sm font-medium text-foreground">{displayName}</p>
+              <p className="text-xs text-muted-foreground">{email}</p>
             </div>
           </div>
         </div>
@@ -77,7 +100,7 @@ export default function SettingsPage() {
             </div>
             <button
               type="button"
-              className="rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-accent transition-colors"
+              className="rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-accent transition-colors cursor-pointer"
             >
               Export JSON
             </button>
@@ -88,10 +111,10 @@ export default function SettingsPage() {
         <div className="rounded-xl border border-border bg-card p-6 space-y-2">
           <div className="flex items-center gap-2">
             <Shield className="h-4 w-4 text-emerald-500" />
-            <span className="text-xs font-medium text-foreground">Row Level Security Prepared</span>
+            <span className="text-xs font-medium text-foreground">Row Level Security Active</span>
           </div>
           <p className="text-[11px] text-muted-foreground">
-            Database architecture configured with PostgreSQL RLS policies ready for backend integration.
+            Authenticated session is bound to your user ID with Supabase Row Level Security.
           </p>
         </div>
       </div>

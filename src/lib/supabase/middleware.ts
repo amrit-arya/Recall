@@ -2,6 +2,8 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import type { Database } from '@/types/database'
 
+const PROTECTED_PREFIXES = ['/dashboard', '/memories', '/sessions', '/settings', '/timeline']
+
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request,
@@ -35,8 +37,31 @@ export async function updateSession(request: NextRequest) {
     }
   )
 
-  // Refresh auth token if needed
-  await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  const pathname = request.nextUrl.pathname
+  const isAuthRoute = pathname === '/login' || pathname === '/register'
+  const isProtectedRoute = PROTECTED_PREFIXES.some((prefix) => pathname.startsWith(prefix))
+  const isRootRoute = pathname === '/'
+
+  // 1. Unauthenticated user trying to access protected routes or root -> redirect to /login
+  if (!user && (isProtectedRoute || isRootRoute)) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/login'
+    if (isProtectedRoute) {
+      url.searchParams.set('next', pathname)
+    }
+    return NextResponse.redirect(url)
+  }
+
+  // 2. Authenticated user trying to access auth routes or root -> redirect to /dashboard
+  if (user && (isAuthRoute || isRootRoute)) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/dashboard'
+    return NextResponse.redirect(url)
+  }
 
   return supabaseResponse
 }

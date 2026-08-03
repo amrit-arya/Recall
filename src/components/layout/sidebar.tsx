@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { Logo } from "@/components/shared/logo";
 import { NAV_ITEMS, isNavActive } from "@/lib/navigation";
 import { ThemeToggle } from "@/components/providers/theme-toggle";
+import { SignOutButton } from "@/components/auth/sign-out-button";
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -43,9 +44,10 @@ export function Sidebar() {
           })}
         </nav>
 
-        {/* Theme toggle */}
-        <div className="border-t border-border px-3 py-3">
+        {/* Footer controls: Theme toggle & Sign out */}
+        <div className="border-t border-border p-3 space-y-1">
           <ThemeToggle variant="menu" />
+          <SignOutButton variant="menu" />
         </div>
       </div>
     </aside>

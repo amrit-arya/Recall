@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import { Logo } from "@/components/shared/logo";
 import { getPageTitle } from "@/lib/navigation";
 import { ThemeToggle } from "@/components/providers/theme-toggle";
+import { SignOutButton } from "@/components/auth/sign-out-button";
 
 export function Header() {
   const pathname = usePathname();
@@ -24,9 +25,10 @@ export function Header() {
       {/* Spacer */}
       <div className="flex-1" />
 
-      {/* Mobile theme toggle */}
-      <div className="md:hidden">
+      {/* Mobile controls */}
+      <div className="flex items-center gap-2 md:hidden">
         <ThemeToggle variant="icon" />
+        <SignOutButton showText={false} />
       </div>
     </header>
   );
