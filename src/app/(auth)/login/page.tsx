@@ -4,12 +4,14 @@ import { useState, Suspense } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient as createBrowserClient } from '@/lib/supabase/client'
+import { getSafeRedirect } from '@/lib/utils/redirect'
 import { LogIn, Loader2, AlertCircle } from 'lucide-react'
 
 function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const next = searchParams.get('next') ?? '/dashboard'
+  const rawNext = searchParams.get('next')
+  const safeNext = getSafeRedirect(rawNext, '/dashboard')
   const initialError = searchParams.get('error')
 
   const [email, setEmail] = useState('')
@@ -45,7 +47,7 @@ function LoginForm() {
         return
       }
 
-      router.push(next)
+      router.push(safeNext)
       router.refresh()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unexpected error occurred.')

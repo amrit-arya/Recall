@@ -7,3 +7,4 @@
  */
 
 export type { Database } from '@/types/database'
+export { getCurrentUser, getCurrentProfile, signOut } from './auth'

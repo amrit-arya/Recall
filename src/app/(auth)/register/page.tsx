@@ -61,25 +61,24 @@ export default function RegisterPage() {
       }
 
       if (data.user) {
-        // 2. Insert user profile into public.profiles
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .upsert({
-            id: data.user.id,
-            display_name: displayName.trim() || email.split('@')[0],
-          })
-
-        if (profileError) {
-          console.warn('Profile creation note:', profileError.message)
-        }
-
+        // 2. Only upsert profile if active session exists (L2 Fix)
         if (data.session) {
-          // Auto-confirm is enabled, redirect directly to dashboard
+          const { error: profileError } = await supabase
+            .from('profiles')
+            .upsert({
+              id: data.user.id,
+              display_name: displayName.trim() || email.split('@')[0],
+            })
+
+          if (profileError) {
+            console.warn('Profile creation note:', profileError.message)
+          }
+
           router.push('/dashboard')
           router.refresh()
           return
         } else {
-          // Email confirmation is required
+          // Email confirmation is required (unauthenticated until confirmed)
           setSuccessMessage(
             'Account created successfully! Please check your email to confirm your account before logging in.'
           )

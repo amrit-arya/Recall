@@ -1,11 +1,11 @@
 import { createClient as createServerClient } from './server'
 import { createClient as createBrowserClient } from './client'
-import type { User, Session } from '@supabase/supabase-js'
+import type { User } from '@supabase/supabase-js'
 import type { Tables } from '@/types/database'
 
 /**
  * Server-side helper to retrieve the authenticated user.
- * Uses supabase.auth.getUser() to validate the token against the Supabase Auth server.
+ * Always uses supabase.auth.getUser() to validate the token against the Supabase Auth server.
  */
 export async function getCurrentUser(): Promise<User | null> {
   const supabase = await createServerClient()
@@ -14,18 +14,6 @@ export async function getCurrentUser(): Promise<User | null> {
     return null
   }
   return user
-}
-
-/**
- * Server-side helper to retrieve the current session.
- */
-export async function getCurrentSession(): Promise<Session | null> {
-  const supabase = await createServerClient()
-  const { data: { session }, error } = await supabase.auth.getSession()
-  if (error || !session) {
-    return null
-  }
-  return session
 }
 
 /**
