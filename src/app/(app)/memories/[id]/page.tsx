@@ -133,7 +133,8 @@ export default async function MemoryDetailPage({ params }: MemoryDetailPageProps
                   src={memory.attachmentUrl}
                   alt={memory.title}
                   fill
-                  className="object-cover"
+                  unoptimized
+                  className="object-contain bg-black/20"
                   sizes="(max-width: 768px) 100vw, 800px"
                 />
               </div>

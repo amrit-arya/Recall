@@ -1,6 +1,7 @@
 import type { Memory, Session, ActivityStats, TimelineEvent } from "@/types";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/supabase/auth";
+import { STORAGE_BUCKET } from "@/lib/supabase/storage";
 import {
   mockSessions,
   mockActivityStats,
@@ -33,8 +34,11 @@ interface SupabaseMemoryRow {
   session_memories?: SupabaseSessionMemoryRelation[];
 }
 
-/** Helper to map raw Supabase row + relations to application Memory model */
-function mapRowToMemory(row: SupabaseMemoryRow): Memory {
+/** Helper to map raw Supabase row + relations to application Memory model, resolving signed URLs for private storage */
+async function mapRowToMemory(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  row: SupabaseMemoryRow
+): Promise<Memory> {
   const tags: string[] = Array.isArray(row.memory_tags)
     ? row.memory_tags
         .map((mt) => mt.tags?.name)
@@ -47,6 +51,22 @@ function mapRowToMemory(row: SupabaseMemoryRow): Memory {
         .filter((id): id is string => typeof id === "string")
     : [];
 
+  let attachmentUrl: string | undefined = undefined;
+
+  // Resolve short-lived signed URL for private attachments
+  if (row.attachment_path) {
+    try {
+      const { data } = await supabase.storage
+        .from(STORAGE_BUCKET)
+        .createSignedUrl(row.attachment_path, 3600); // 1 hour expiry
+      if (data?.signedUrl) {
+        attachmentUrl = data.signedUrl;
+      }
+    } catch (err) {
+      console.warn('Failed to resolve signed URL for attachment:', err);
+    }
+  }
+
   return {
     id: row.id,
     title: row.title,
@@ -56,7 +76,7 @@ function mapRowToMemory(row: SupabaseMemoryRow): Memory {
     description: row.description || undefined,
     aiSummary: row.ai_summary || undefined,
     collection: row.collection || undefined,
-    attachmentUrl: row.attachment_path || undefined,
+    attachmentUrl,
     createdAt: row.created_at,
     tags,
     sessionIds,
@@ -91,7 +111,8 @@ export async function getMemories(): Promise<Memory[]> {
     return [];
   }
 
-  return (data as unknown as SupabaseMemoryRow[]).map(mapRowToMemory);
+  const rows = data as unknown as SupabaseMemoryRow[];
+  return Promise.all(rows.map((row) => mapRowToMemory(supabase, row)));
 }
 
 /**
@@ -122,7 +143,7 @@ export async function getMemoryById(id: string): Promise<Memory | undefined> {
     return undefined;
   }
 
-  return mapRowToMemory(data as unknown as SupabaseMemoryRow);
+  return mapRowToMemory(supabase, data as unknown as SupabaseMemoryRow);
 }
 
 /**
@@ -153,7 +174,8 @@ export async function getRecentMemories(limit = 6): Promise<Memory[]> {
     return [];
   }
 
-  return (data as unknown as SupabaseMemoryRow[]).map(mapRowToMemory);
+  const rows = data as unknown as SupabaseMemoryRow[];
+  return Promise.all(rows.map((row) => mapRowToMemory(supabase, row)));
 }
 
 /**

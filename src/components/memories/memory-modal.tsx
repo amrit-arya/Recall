@@ -5,7 +5,26 @@ import { useRouter } from 'next/navigation'
 import type { Memory, MemoryType } from '@/types'
 import { createMemoryAction, updateMemoryAction, type MemoryInput } from '@/lib/actions/memories'
 import { getUrlMetadataAction } from '@/lib/actions/url-metadata'
-import { X, Loader2, Link as LinkIcon, FileText, Code, AlignLeft, Sparkles, Globe, ArrowDownLeft } from 'lucide-react'
+import { createClient as createBrowserClient } from '@/lib/supabase/client'
+import {
+  STORAGE_BUCKET,
+  validateAttachmentFile,
+  buildStoragePath,
+} from '@/lib/supabase/storage'
+import {
+  X,
+  Loader2,
+  Link as LinkIcon,
+  FileText,
+  Code,
+  AlignLeft,
+  Sparkles,
+  Globe,
+  ArrowDownLeft,
+  Image as ImageIcon,
+  FileCheck,
+  UploadCloud,
+} from 'lucide-react'
 
 interface MemoryModalProps {
   isOpen: boolean
@@ -18,6 +37,8 @@ const memoryTypes: { label: string; value: MemoryType; icon: React.ComponentType
   { label: 'Note', value: 'note', icon: FileText },
   { label: 'Text', value: 'text', icon: AlignLeft },
   { label: 'Code', value: 'code', icon: Code },
+  { label: 'Image', value: 'image', icon: ImageIcon },
+  { label: 'PDF', value: 'pdf', icon: FileCheck },
 ]
 
 function MemoryModalForm({
@@ -32,8 +53,8 @@ function MemoryModalForm({
 
   const [title, setTitle] = useState(initialMemory?.title || '')
   const [type, setType] = useState<MemoryType>(
-    initialMemory && ['url', 'note', 'text', 'code'].includes(initialMemory.type)
-      ? initialMemory.type
+    initialMemory && ['url', 'note', 'text', 'code', 'image', 'screenshot', 'pdf'].includes(initialMemory.type)
+      ? initialMemory.type === 'screenshot' ? 'image' : initialMemory.type
       : 'note'
   )
   const [url, setUrl] = useState(initialMemory?.url || '')
@@ -42,7 +63,12 @@ function MemoryModalForm({
   const [collection, setCollection] = useState(initialMemory?.collection || '')
   const [tagsInput, setTagsInput] = useState(initialMemory?.tags ? initialMemory.tags.join(', ') : '')
 
+  // File Attachment State
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [filePreview, setFilePreview] = useState<string | null>(null)
+
   const [loading, setLoading] = useState(false)
+  const [uploadingFile, setUploadingFile] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   // URL Metadata state
@@ -54,6 +80,36 @@ function MemoryModalForm({
     domain?: string
     faviconUrl?: string
   } | null>(null)
+
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    setError(null)
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    const validationError = validateAttachmentFile(file)
+    if (validationError) {
+      setError(validationError)
+      setSelectedFile(null)
+      setFilePreview(null)
+      return
+    }
+
+    setSelectedFile(file)
+
+    // Auto-fill title if blank
+    if (!title.trim()) {
+      const cleanTitle = file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ')
+      setTitle(cleanTitle)
+    }
+
+    // Generate preview thumbnail if image
+    if (file.type.startsWith('image/')) {
+      const objectUrl = URL.createObjectURL(file)
+      setFilePreview(objectUrl)
+    } else {
+      setFilePreview(null)
+    }
+  }
 
   async function fetchMetadata(targetUrl: string, autoFill: boolean = false) {
     if (!targetUrl || !targetUrl.trim()) return
@@ -68,7 +124,6 @@ function MemoryModalForm({
       if (res.success && res.metadata) {
         setFetchedMetadata(res.metadata)
 
-        // Prefill fields if requested or empty
         if (res.metadata.title && (!title.trim() || autoFill)) {
           setTitle(res.metadata.title)
         }
@@ -110,7 +165,58 @@ function MemoryModalForm({
       return
     }
 
+    if ((type === 'image' || type === 'pdf') && !selectedFile && !isEditing && !initialMemory?.attachmentUrl) {
+      setError(`Please select a ${type.toUpperCase()} file to upload.`)
+      return
+    }
+
     setLoading(true)
+
+    let attachmentPath: string | undefined = undefined
+
+    // Upload attachment to private Supabase storage bucket if selected
+    if (selectedFile) {
+      setUploadingFile(true)
+      try {
+        const supabase = createBrowserClient()
+        const { data: { user } } = await supabase.auth.getUser()
+
+        if (!user) {
+          setError('You must be logged in to upload attachments.')
+          setLoading(false)
+          setUploadingFile(false)
+          return
+        }
+
+        const path = buildStoragePath(user.id, selectedFile.name)
+
+        const { error: uploadError } = await supabase.storage
+          .from(STORAGE_BUCKET)
+          .upload(path, selectedFile, {
+            contentType: selectedFile.type,
+            cacheControl: '3600',
+            upsert: false,
+          })
+
+        if (uploadError) {
+          console.error('Storage upload error:', uploadError)
+          setError(`File upload failed: ${uploadError.message}`)
+          setLoading(false)
+          setUploadingFile(false)
+          return
+        }
+
+        attachmentPath = path
+      } catch (uploadErr) {
+        console.error('Storage upload exception:', uploadErr)
+        setError('File upload failed. Please try again.')
+        setLoading(false)
+        setUploadingFile(false)
+        return
+      }
+    }
+
+    setUploadingFile(false)
 
     const parsedTags = tagsInput
       .split(',')
@@ -124,6 +230,7 @@ function MemoryModalForm({
       content: content.trim() || undefined,
       description: description.trim() || undefined,
       collection: collection.trim() || undefined,
+      attachmentPath: attachmentPath || (isEditing ? initialMemory?.attachmentUrl : undefined),
       tags: parsedTags,
     }
 
@@ -175,7 +282,7 @@ function MemoryModalForm({
         {/* Type Selector */}
         <div className="space-y-1.5">
           <label className="text-xs font-medium text-foreground">Memory Type</label>
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
             {memoryTypes.map((t) => {
               const Icon = t.icon
               const selected = type === t.value
@@ -184,19 +291,67 @@ function MemoryModalForm({
                   key={t.value}
                   type="button"
                   onClick={() => setType(t.value)}
-                  className={`flex flex-col items-center justify-center gap-1.5 rounded-xl border p-2.5 text-xs font-medium transition-all cursor-pointer ${
+                  className={`flex flex-col items-center justify-center gap-1 rounded-xl border p-2 text-xs font-medium transition-all cursor-pointer ${
                     selected
                       ? 'border-primary bg-primary/10 text-primary'
                       : 'border-border bg-background text-muted-foreground hover:border-border hover:text-foreground'
                   }`}
                 >
-                  <Icon className="h-4 w-4" />
-                  <span>{t.label}</span>
+                  <Icon className="h-4 w-4 shrink-0" />
+                  <span className="text-[11px]">{t.label}</span>
                 </button>
               )
             })}
           </div>
         </div>
+
+        {/* File Picker Section for Image or PDF */}
+        {(type === 'image' || type === 'pdf') && (
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-foreground">
+              Attachment ({type === 'image' ? 'Image File' : 'PDF Document'}) *
+            </label>
+            <div className="border-2 border-dashed border-border rounded-xl p-4 text-center hover:border-primary/50 transition-colors bg-background/50 space-y-2">
+              <input
+                id="file-input"
+                type="file"
+                accept={type === 'image' ? 'image/png,image/jpeg,image/webp,image/gif' : 'application/pdf'}
+                onChange={handleFileSelect}
+                disabled={loading}
+                className="hidden"
+              />
+              <label htmlFor="file-input" className="cursor-pointer space-y-2 block">
+                {filePreview ? (
+                  <div className="space-y-2">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={filePreview}
+                      alt="Preview"
+                      className="max-h-36 mx-auto rounded-lg border border-border object-contain"
+                    />
+                    <p className="text-xs font-medium text-foreground">{selectedFile?.name}</p>
+                    <p className="text-[10px] text-muted-foreground">Click to change image</p>
+                  </div>
+                ) : selectedFile ? (
+                  <div className="flex items-center justify-center gap-2 text-sm font-medium text-foreground">
+                    <FileCheck className="h-5 w-5 text-primary" />
+                    <span>{selectedFile.name} ({ (selectedFile.size / (1024 * 1024)).toFixed(1) } MB)</span>
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    <UploadCloud className="h-8 w-8 mx-auto text-muted-foreground" />
+                    <p className="text-xs font-medium text-foreground">
+                      Click to choose {type === 'image' ? 'an Image' : 'a PDF'} file
+                    </p>
+                    <p className="text-[10px] text-muted-foreground">
+                      {type === 'image' ? 'PNG, JPG, WEBP, GIF' : 'PDF documents'} up to 10 MB
+                    </p>
+                  </div>
+                )}
+              </label>
+            </div>
+          </div>
+        )}
 
         {/* URL Input (shown if type === 'url' or optional) */}
         {(type === 'url' || url) && (
@@ -276,26 +431,28 @@ function MemoryModalForm({
         </div>
 
         {/* Content */}
-        <div className="space-y-1.5">
-          <label htmlFor="memory-content" className="text-xs font-medium text-foreground">
-            {type === 'code' ? 'Code Snippet' : 'Content / Notes'}
-          </label>
-          <textarea
-            id="memory-content"
-            rows={type === 'code' ? 5 : 3}
-            placeholder={
-              type === 'code'
-                ? '// Paste your code snippet here...'
-                : 'Enter details, text, or reference notes...'
-            }
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            disabled={loading}
-            className={`w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50 ${
-              type === 'code' ? 'font-mono text-xs' : ''
-            }`}
-          />
-        </div>
+        {type !== 'image' && type !== 'pdf' && (
+          <div className="space-y-1.5">
+            <label htmlFor="memory-content" className="text-xs font-medium text-foreground">
+              {type === 'code' ? 'Code Snippet' : 'Content / Notes'}
+            </label>
+            <textarea
+              id="memory-content"
+              rows={type === 'code' ? 5 : 3}
+              placeholder={
+                type === 'code'
+                  ? '// Paste your code snippet here...'
+                  : 'Enter details, text, or reference notes...'
+              }
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              disabled={loading}
+              className={`w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50 ${
+                type === 'code' ? 'font-mono text-xs' : ''
+              }`}
+            />
+          </div>
+        )}
 
         {/* Description / Summary */}
         <div className="space-y-1.5">
@@ -365,7 +522,7 @@ function MemoryModalForm({
             {loading ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                <span>{isEditing ? 'Saving...' : 'Capturing...'}</span>
+                <span>{uploadingFile ? 'Uploading file...' : isEditing ? 'Saving...' : 'Capturing...'}</span>
               </>
             ) : (
               <span>{isEditing ? 'Save Changes' : 'Capture Memory'}</span>

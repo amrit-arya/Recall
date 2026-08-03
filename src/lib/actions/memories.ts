@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { getCurrentUser } from '@/lib/supabase/auth'
+import { STORAGE_BUCKET } from '@/lib/supabase/storage'
 import { revalidatePath } from 'next/cache'
 import type { MemoryType } from '@/types'
 
@@ -12,6 +13,7 @@ export interface MemoryInput {
   url?: string
   description?: string
   collection?: string
+  attachmentPath?: string
   tags?: string[]
 }
 
@@ -77,6 +79,7 @@ export async function createMemoryAction(
         url: formattedUrl || null,
         description: input.description?.trim() || null,
         collection: input.collection?.trim() || null,
+        attachment_path: input.attachmentPath || null,
       })
       .select('id')
       .single()
@@ -91,7 +94,6 @@ export async function createMemoryAction(
       const cleanTags = Array.from(new Set(input.tags.map((t) => t.trim()).filter(Boolean)))
 
       for (const tagName of cleanTags) {
-        // Upsert tag
         const { data: tagData } = await supabase
           .from('tags')
           .select('id')
@@ -160,6 +162,7 @@ export async function updateMemoryAction(
         url: formattedUrl || null,
         description: input.description?.trim() || null,
         collection: input.collection?.trim() || null,
+        attachment_path: input.attachmentPath || null,
       })
       .eq('id', id)
       .eq('user_id', user.id)
@@ -222,7 +225,15 @@ export async function deleteMemoryAction(id: string): Promise<ActionResponse> {
 
     const supabase = await createClient()
 
-    // Belt-and-suspenders: eq('id', id).eq('user_id', user.id)
+    // 1. Retrieve memory to check for attachment_path
+    const { data: existingMemory } = await supabase
+      .from('memories')
+      .select('attachment_path')
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .maybeSingle()
+
+    // 2. Delete Memory row from PostgreSQL
     const { error: deleteError } = await supabase
       .from('memories')
       .delete()
@@ -232,6 +243,15 @@ export async function deleteMemoryAction(id: string): Promise<ActionResponse> {
     if (deleteError) {
       console.error('Delete memory error:', deleteError)
       return { error: deleteError.message }
+    }
+
+    // 3. Clean up associated private storage attachment object if present
+    if (existingMemory?.attachment_path) {
+      try {
+        await supabase.storage.from(STORAGE_BUCKET).remove([existingMemory.attachment_path])
+      } catch (storageErr) {
+        console.warn('Failed to remove storage object:', storageErr)
+      }
     }
 
     revalidatePath('/memories')
