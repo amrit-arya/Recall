@@ -3,7 +3,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Calendar, Folder, Tag, Paperclip, Sparkles } from "lucide-react";
-import { getMemoryById, getSessions } from "@/lib/data";
+import { getMemoryById, getSessionsForMemory } from "@/lib/data";
 import { MemoryTypeIcon, MemoryTypeBadge } from "@/components/shared/memory-type-icon";
 import { formatRelativeTime, extractDomain } from "@/lib/utils";
 import { SessionCard } from "@/components/sessions/session-card";
@@ -31,11 +31,8 @@ export default async function MemoryDetailPage({ params }: MemoryDetailPageProps
     notFound();
   }
 
-  // Associated sessions via Data Access Layer
-  const allSessions = await getSessions();
-  const associatedSessions = allSessions.filter((s) =>
-    memory.sessionIds?.includes(s.id)
-  );
+  // Associated sessions via Data Access Layer junction query
+  const associatedSessions = await getSessionsForMemory(memory.id);
 
   return (
     <div className="flex-1 overflow-y-auto">

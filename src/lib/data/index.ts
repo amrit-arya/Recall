@@ -211,6 +211,75 @@ export async function getRecentMemories(limit = 6): Promise<Memory[]> {
 }
 
 /**
+ * Fetch memories attached to a specific session.
+ */
+export async function getMemoriesForSession(sessionId: string): Promise<Memory[]> {
+  const user = await getCurrentUser();
+  if (!user || !sessionId) return [];
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("session_memories")
+    .select(`
+      memory_id,
+      memories (
+        *,
+        memory_tags (
+          tags ( name )
+        ),
+        session_memories (
+          session_id
+        )
+      )
+    `)
+    .eq("session_id", sessionId);
+
+  if (error || !data) {
+    if (error) console.error("getMemoriesForSession query error:", error);
+    return [];
+  }
+
+  const memoryRows = data
+    .map((item: { memories: unknown }) => item.memories)
+    .filter(Boolean) as SupabaseMemoryRow[];
+
+  return Promise.all(memoryRows.map((row) => mapRowToMemory(supabase, row)));
+}
+
+/**
+ * Fetch sessions associated with a specific memory.
+ */
+export async function getSessionsForMemory(memoryId: string): Promise<Session[]> {
+  const user = await getCurrentUser();
+  if (!user || !memoryId) return [];
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("session_memories")
+    .select(`
+      session_id,
+      sessions (
+        *,
+        session_memories (
+          memory_id
+        )
+      )
+    `)
+    .eq("memory_id", memoryId);
+
+  if (error || !data) {
+    if (error) console.error("getSessionsForMemory query error:", error);
+    return [];
+  }
+
+  const sessionRows = data
+    .map((item: { sessions: unknown }) => item.sessions)
+    .filter(Boolean) as SupabaseSessionRow[];
+
+  return sessionRows.map(mapRowToSession);
+}
+
+/**
  * Fetch distinct collections for the authenticated user.
  */
 export async function getCollections(): Promise<string[]> {
