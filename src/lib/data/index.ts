@@ -3,8 +3,6 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/supabase/auth";
 import { STORAGE_BUCKET } from "@/lib/supabase/storage";
 import {
-  mockSessions,
-  mockActivityStats,
   mockInboxCount,
   mockTimelineEvents,
 } from "@/lib/mock-data";
@@ -32,6 +30,21 @@ interface SupabaseMemoryRow {
   updated_at: string;
   memory_tags?: SupabaseMemoryTagRelation[];
   session_memories?: SupabaseSessionMemoryRelation[];
+}
+
+interface SupabaseSessionRow {
+  id: string;
+  user_id: string;
+  name: string;
+  description: string | null;
+  start_time: string | null;
+  end_time: string | null;
+  progress: string | null;
+  next_step: string | null;
+  status: Session["status"];
+  created_at: string;
+  updated_at: string;
+  session_memories?: { memory_id: string }[];
 }
 
 /** Helper to map raw Supabase row + relations to application Memory model, resolving signed URLs for private storage */
@@ -80,6 +93,25 @@ async function mapRowToMemory(
     createdAt: row.created_at,
     tags,
     sessionIds,
+  };
+}
+
+/** Helper to map raw Supabase session row to application Session model */
+function mapRowToSession(row: SupabaseSessionRow): Session {
+  const memoryCount = Array.isArray(row.session_memories)
+    ? row.session_memories.length
+    : 0;
+
+  return {
+    id: row.id,
+    name: row.name,
+    description: row.description || undefined,
+    startTime: row.start_time || row.created_at,
+    endTime: row.end_time || undefined,
+    progress: row.progress || undefined,
+    nextStep: row.next_step || undefined,
+    status: row.status,
+    memoryCount,
   };
 }
 
@@ -228,37 +260,130 @@ export async function getTags(): Promise<string[]> {
 }
 
 // -----------------------------------------------------------------------------
-// Session & Activity DAL (Mock data retained until Session integration)
+// Session Data Access Layer (Supabase PostgreSQL backed)
 // -----------------------------------------------------------------------------
 
 export async function getSessions(): Promise<Session[]> {
-  return [...mockSessions];
+  const user = await getCurrentUser();
+  if (!user) return [];
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("sessions")
+    .select(`
+      *,
+      session_memories (
+        memory_id
+      )
+    `)
+    .eq("user_id", user.id)
+    .order("updated_at", { ascending: false });
+
+  if (error || !data) {
+    console.error("getSessions query error:", error);
+    return [];
+  }
+
+  const rows = data as unknown as SupabaseSessionRow[];
+  return rows.map(mapRowToSession);
 }
 
 export async function getSessionById(id: string): Promise<Session | undefined> {
-  return mockSessions.find((s) => s.id === id);
+  const user = await getCurrentUser();
+  if (!user || !id) return undefined;
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("sessions")
+    .select(`
+      *,
+      session_memories (
+        memory_id
+      )
+    `)
+    .eq("id", id)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (error || !data) {
+    if (error) console.error("getSessionById query error:", error);
+    return undefined;
+  }
+
+  return mapRowToSession(data as unknown as SupabaseSessionRow);
 }
 
 export async function getActiveSessions(): Promise<Session[]> {
-  return mockSessions.filter(
-    (s) => s.status === "active" || s.status === "paused"
-  );
+  const user = await getCurrentUser();
+  if (!user) return [];
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("sessions")
+    .select(`
+      *,
+      session_memories (
+        memory_id
+      )
+    `)
+    .eq("user_id", user.id)
+    .in("status", ["active", "paused"])
+    .order("updated_at", { ascending: false });
+
+  if (error || !data) {
+    console.error("getActiveSessions query error:", error);
+    return [];
+  }
+
+  const rows = data as unknown as SupabaseSessionRow[];
+  return rows.map(mapRowToSession);
 }
 
 export async function getRecentSessions(limit = 5): Promise<Session[]> {
-  return mockSessions.slice(0, limit);
+  const user = await getCurrentUser();
+  if (!user) return [];
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("sessions")
+    .select(`
+      *,
+      session_memories (
+        memory_id
+      )
+    `)
+    .eq("user_id", user.id)
+    .order("updated_at", { ascending: false })
+    .limit(limit);
+
+  if (error || !data) {
+    console.error("getRecentSessions query error:", error);
+    return [];
+  }
+
+  const rows = data as unknown as SupabaseSessionRow[];
+  return rows.map(mapRowToSession);
 }
 
 export async function getActivityStats(): Promise<ActivityStats> {
   const user = await getCurrentUser();
-  if (!user) return { ...mockActivityStats };
+  if (!user) {
+    return {
+      memoriesThisWeek: 0,
+      sessionsThisWeek: 0,
+      totalMemories: 0,
+      totalSessions: 0,
+    };
+  }
 
-  // Calculate real total memories for the current user
   const memories = await getMemories();
+  const sessions = await getSessions();
+
   return {
-    ...mockActivityStats,
-    totalMemories: memories.length,
     memoriesThisWeek: memories.length,
+    sessionsThisWeek: sessions.length,
+    totalMemories: memories.length,
+    totalSessions: sessions.length,
   };
 }
 

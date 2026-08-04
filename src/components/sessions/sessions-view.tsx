@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Plus, Clock, PlayCircle, PauseCircle, CheckCircle2 } from "lucide-react";
 import type { Session, SessionStatus } from "@/types";
 import { SessionCard } from "@/components/sessions/session-card";
+import { SessionModal } from "@/components/sessions/session-modal";
 import { EmptyState } from "@/components/shared/empty-state";
 import { cn } from "@/lib/utils";
 import { sessionStatusConfig } from "@/components/shared/session-status-badge";
@@ -14,6 +15,7 @@ interface SessionsViewProps {
 
 export function SessionsView({ initialSessions }: SessionsViewProps) {
   const [activeTab, setActiveTab] = useState<SessionStatus | "all">("all");
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const activeSessions = initialSessions.filter((s) => s.status === "active");
   const pausedSessions = initialSessions.filter((s) => s.status === "paused");
@@ -32,7 +34,7 @@ export function SessionsView({ initialSessions }: SessionsViewProps) {
         <div
           role="tablist"
           aria-label="Filter sessions by status"
-          className="flex items-center gap-1.5 rounded-xl border border-border bg-card p-1"
+          className="flex items-center gap-1.5 rounded-xl border border-border bg-card p-1 overflow-x-auto no-scrollbar"
         >
           <button
             type="button"
@@ -40,7 +42,7 @@ export function SessionsView({ initialSessions }: SessionsViewProps) {
             aria-selected={activeTab === "all"}
             onClick={() => setActiveTab("all")}
             className={cn(
-              "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
+              "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer shrink-0",
               activeTab === "all"
                 ? "bg-accent text-foreground"
                 : "text-muted-foreground hover:text-foreground"
@@ -55,7 +57,7 @@ export function SessionsView({ initialSessions }: SessionsViewProps) {
             aria-selected={activeTab === "active"}
             onClick={() => setActiveTab("active")}
             className={cn(
-              "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
+              "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer shrink-0",
               activeTab === "active"
                 ? "bg-accent text-foreground"
                 : "text-muted-foreground hover:text-foreground"
@@ -71,7 +73,7 @@ export function SessionsView({ initialSessions }: SessionsViewProps) {
             aria-selected={activeTab === "paused"}
             onClick={() => setActiveTab("paused")}
             className={cn(
-              "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
+              "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer shrink-0",
               activeTab === "paused"
                 ? "bg-accent text-foreground"
                 : "text-muted-foreground hover:text-foreground"
@@ -87,7 +89,7 @@ export function SessionsView({ initialSessions }: SessionsViewProps) {
             aria-selected={activeTab === "completed"}
             onClick={() => setActiveTab("completed")}
             className={cn(
-              "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
+              "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer shrink-0",
               activeTab === "completed"
                 ? "bg-accent text-foreground"
                 : "text-muted-foreground hover:text-foreground"
@@ -101,7 +103,8 @@ export function SessionsView({ initialSessions }: SessionsViewProps) {
         {/* New Session Button */}
         <button
           type="button"
-          className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors shrink-0"
+          onClick={() => setIsModalOpen(true)}
+          className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors shrink-0 cursor-pointer"
         >
           <Plus className="h-4 w-4" />
           <span>New Session</span>
@@ -114,6 +117,16 @@ export function SessionsView({ initialSessions }: SessionsViewProps) {
           icon={Clock}
           title={`No ${activeTab !== "all" ? activeTab : ""} sessions`}
           description="Create a work session to track progress, record next steps, and attach memories."
+          action={
+            <button
+              type="button"
+              onClick={() => setIsModalOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors cursor-pointer"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Start Your First Session</span>
+            </button>
+          }
         />
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -122,6 +135,12 @@ export function SessionsView({ initialSessions }: SessionsViewProps) {
           ))}
         </div>
       )}
+
+      {/* New Session Modal */}
+      <SessionModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+      />
     </div>
   );
 }
