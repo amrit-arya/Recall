@@ -8,7 +8,7 @@ import { RecentSessions } from "@/components/dashboard/recent-sessions";
 import { ActivityOverview } from "@/components/dashboard/activity-overview";
 import {
   getRecentMemories,
-  getActiveSessions,
+  getUnfinishedSessions,
   getRecentSessions,
   getActivityStats,
   getInboxCount,
@@ -23,13 +23,13 @@ export const dynamic = "force-dynamic";
 export default async function DashboardPage() {
   const [
     recentMemories,
-    activeSessions,
+    unfinishedSessions,
     recentSessions,
     activityStats,
     inboxCount,
   ] = await Promise.all([
     getRecentMemories(6),
-    getActiveSessions(),
+    getUnfinishedSessions(4),
     getRecentSessions(5),
     getActivityStats(),
     getInboxCount(),
@@ -54,7 +54,7 @@ export default async function DashboardPage() {
           {/* Left column: main content */}
           <div className="space-y-8">
             {/* Continue Working */}
-            <ContinueWorking sessions={activeSessions} />
+            <ContinueWorking sessions={unfinishedSessions} />
 
             {/* Recent Memories */}
             <RecentMemories memories={recentMemories} />

@@ -1,5 +1,5 @@
 import type { Session } from "@/types";
-import { SessionCard } from "@/components/sessions/session-card";
+import { ContinueWorkingCard } from "@/components/dashboard/continue-working-card";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Clock } from "lucide-react";
 
@@ -21,7 +21,7 @@ export function ContinueWorking({ sessions }: ContinueWorkingProps) {
         </h2>
         {unfinished.length > 0 && (
           <span className="text-xs text-muted-foreground">
-            {unfinished.length} {unfinished.length === 1 ? "session" : "sessions"}
+            {unfinished.length} {unfinished.length === 1 ? "active session" : "unfinished sessions"}
           </span>
         )}
       </div>
@@ -30,13 +30,13 @@ export function ContinueWorking({ sessions }: ContinueWorkingProps) {
         <EmptyState
           icon={Clock}
           title="No active sessions"
-          description="Start a session to track your work and pick up where you left off."
+          description="Start a session to track your work, save next steps, and pick up right where you left off."
           className="py-8"
         />
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {unfinished.map((session) => (
-            <SessionCard key={session.id} session={session} />
+            <ContinueWorkingCard key={session.id} session={session} />
           ))}
         </div>
       )}

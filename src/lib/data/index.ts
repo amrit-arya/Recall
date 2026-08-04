@@ -408,6 +408,45 @@ export async function getActiveSessions(): Promise<Session[]> {
   return rows.map(mapRowToSession);
 }
 
+/**
+ * Fetch recent unfinished sessions for 'Continue Working' section on Dashboard.
+ * Prioritizes 'active' sessions first, followed by 'paused' sessions, ordered by updated_at desc.
+ */
+export async function getUnfinishedSessions(limit = 4): Promise<Session[]> {
+  const user = await getCurrentUser();
+  if (!user) return [];
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("sessions")
+    .select(`
+      *,
+      session_memories (
+        memory_id
+      )
+    `)
+    .eq("user_id", user.id)
+    .in("status", ["active", "paused"])
+    .order("updated_at", { ascending: false });
+
+  if (error || !data) {
+    console.error("getUnfinishedSessions query error:", error);
+    return [];
+  }
+
+  const rows = data as unknown as SupabaseSessionRow[];
+  const sessions = rows.map(mapRowToSession);
+
+  // Sort active sessions first, then paused sessions
+  const sorted = sessions.sort((a, b) => {
+    if (a.status === "active" && b.status !== "active") return -1;
+    if (a.status !== "active" && b.status === "active") return 1;
+    return 0;
+  });
+
+  return sorted.slice(0, limit);
+}
+
 export async function getRecentSessions(limit = 5): Promise<Session[]> {
   const user = await getCurrentUser();
   if (!user) return [];
