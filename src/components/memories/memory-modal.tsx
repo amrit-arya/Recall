@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import type { Memory, MemoryType } from '@/types'
 import { createMemoryAction, updateMemoryAction, type MemoryInput } from '@/lib/actions/memories'
 import { getUrlMetadataAction } from '@/lib/actions/url-metadata'
+import { generateMemoryAISuggestionsAction } from '@/lib/actions/ai-suggestions'
 import { createClient as createBrowserClient } from '@/lib/supabase/client'
 import {
   STORAGE_BUCKET,
@@ -24,6 +25,7 @@ import {
   Image as ImageIcon,
   FileCheck,
   UploadCloud,
+  Wand2,
 } from 'lucide-react'
 
 interface MemoryModalProps {
@@ -70,6 +72,10 @@ function MemoryModalForm({
   const [loading, setLoading] = useState(false)
   const [uploadingFile, setUploadingFile] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // AI Suggestions state
+  const [generatingAI, setGeneratingAI] = useState(false)
+  const [aiNotice, setAiNotice] = useState<string | null>(null)
 
   // URL Metadata state
   const [fetchingMetadata, setFetchingMetadata] = useState(false)
@@ -148,6 +154,57 @@ function MemoryModalForm({
   function handleUrlBlur() {
     if (type === 'url' && url.trim() && !fetchedMetadata && !fetchingMetadata) {
       fetchMetadata(url, true)
+    }
+  }
+
+  async function handleGenerateAISuggestions() {
+    if (!title.trim()) {
+      setError('Please enter a title first to generate AI suggestions.')
+      return
+    }
+
+    setGeneratingAI(true)
+    setAiNotice(null)
+    setError(null)
+
+    const res = await generateMemoryAISuggestionsAction({
+      title: title.trim(),
+      content: content.trim() || undefined,
+      url: url.trim() || undefined,
+      type,
+      description: description.trim() || undefined,
+    })
+
+    setGeneratingAI(false)
+
+    if (res.error) {
+      setAiNotice(res.error)
+      return
+    }
+
+    if (res.data) {
+      // Pre-fill summary if user description is blank or updated
+      if (res.data.summary) {
+        setDescription(res.data.summary)
+      }
+
+      // Merge suggested tags with existing input
+      if (res.data.suggestedTags && res.data.suggestedTags.length > 0) {
+        const existingTags = tagsInput
+          .split(',')
+          .map((t) => t.trim().toLowerCase().replace(/^#/, ''))
+          .filter(Boolean)
+
+        const merged = Array.from(new Set([...existingTags, ...res.data.suggestedTags]))
+        setTagsInput(merged.join(', '))
+      }
+
+      // Pre-fill collection if currently blank
+      if (res.data.suggestedCollection && !collection.trim()) {
+        setCollection(res.data.suggestedCollection)
+      }
+
+      setAiNotice('✨ AI suggestions applied! Review and edit fields before saving.')
     }
   }
 
@@ -262,19 +319,43 @@ function MemoryModalForm({
             {isEditing ? 'Edit Memory' : 'Capture New Memory'}
           </h2>
         </div>
-        <button
-          type="button"
-          onClick={onClose}
-          disabled={loading}
-          className="rounded-lg p-1 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors cursor-pointer"
-        >
-          <X className="h-5 w-5" />
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleGenerateAISuggestions}
+            disabled={generatingAI || loading}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary/20 transition-colors disabled:opacity-50 cursor-pointer"
+            title="Generate AI summary, tags, and category"
+          >
+            {generatingAI ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Wand2 className="h-3.5 w-3.5 text-primary" />
+            )}
+            <span>Auto-suggest with AI</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={loading}
+            className="rounded-lg p-1 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors cursor-pointer"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
       </div>
 
       {error && (
         <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-600 dark:text-red-400">
           {error}
+        </div>
+      )}
+
+      {aiNotice && (
+        <div className="rounded-lg border border-primary/20 bg-primary/10 p-2.5 text-xs text-primary flex items-center gap-1.5">
+          <Wand2 className="h-4 w-4 shrink-0 text-primary" />
+          <span>{aiNotice}</span>
         </div>
       )}
 
