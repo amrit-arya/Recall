@@ -4,7 +4,6 @@ import { getCurrentUser } from "@/lib/supabase/auth";
 import { STORAGE_BUCKET } from "@/lib/supabase/storage";
 import {
   mockInboxCount,
-  mockTimelineEvents,
 } from "@/lib/mock-data";
 
 interface SupabaseMemoryTagRelation {
@@ -500,5 +499,73 @@ export async function getInboxCount(): Promise<number> {
 }
 
 export async function getTimelineEvents(): Promise<TimelineEvent[]> {
-  return [...mockTimelineEvents];
+  const user = await getCurrentUser();
+  if (!user) return [];
+
+  const [memories, sessions] = await Promise.all([
+    getMemories(),
+    getSessions(),
+  ]);
+
+  const events: TimelineEvent[] = [];
+
+  // Synthesize events from user memories
+  memories.forEach((mem) => {
+    events.push({
+      id: `mem-${mem.id}`,
+      type: "memory_created",
+      title: "Captured memory",
+      description: mem.description || (mem.content ? mem.content.slice(0, 120) : undefined),
+      entityId: mem.id,
+      entityName: mem.title,
+      createdAt: mem.createdAt,
+    });
+  });
+
+  // Synthesize events from user sessions
+  sessions.forEach((sess) => {
+    // Session Started event
+    if (sess.startTime) {
+      events.push({
+        id: `sess-start-${sess.id}`,
+        type: "session_started",
+        title: "Started session",
+        description: sess.description || undefined,
+        entityId: sess.id,
+        entityName: sess.name,
+        createdAt: sess.startTime,
+      });
+    }
+
+    // Session Paused event
+    if (sess.status === "paused") {
+      events.push({
+        id: `sess-pause-${sess.id}`,
+        type: "session_paused",
+        title: "Paused session",
+        description: sess.progress ? `Progress: ${sess.progress}` : undefined,
+        entityId: sess.id,
+        entityName: sess.name,
+        createdAt: sess.startTime,
+      });
+    }
+
+    // Session Completed event
+    if (sess.status === "completed") {
+      events.push({
+        id: `sess-completed-${sess.id}`,
+        type: "session_completed",
+        title: "Completed session",
+        description: sess.progress ? `Final progress: ${sess.progress}` : undefined,
+        entityId: sess.id,
+        entityName: sess.name,
+        createdAt: sess.endTime || sess.startTime,
+      });
+    }
+  });
+
+  // Sort events chronologically descending (newest first)
+  events.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+  return events;
 }
