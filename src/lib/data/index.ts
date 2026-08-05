@@ -2,9 +2,6 @@ import type { Memory, Session, ActivityStats, TimelineEvent } from "@/types";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/supabase/auth";
 import { STORAGE_BUCKET } from "@/lib/supabase/storage";
-import {
-  mockInboxCount,
-} from "@/lib/mock-data";
 
 interface SupabaseMemoryTagRelation {
   tags: { name: string } | null;
@@ -46,11 +43,39 @@ interface SupabaseSessionRow {
   session_memories?: { memory_id: string }[];
 }
 
-/** Helper to map raw Supabase row + relations to application Memory model, resolving signed URLs for private storage */
-async function mapRowToMemory(
+/** Helper to resolve signed URLs in a single batch call */
+export async function resolveSignedUrlMap(
   supabase: Awaited<ReturnType<typeof createClient>>,
-  row: SupabaseMemoryRow
-): Promise<Memory> {
+  paths: string[]
+): Promise<Map<string, string>> {
+  const urlMap = new Map<string, string>();
+  const uniquePaths = Array.from(new Set(paths.filter((p): p is string => Boolean(p))));
+  if (uniquePaths.length === 0) return urlMap;
+
+  try {
+    const { data } = await supabase.storage
+      .from(STORAGE_BUCKET)
+      .createSignedUrls(uniquePaths, 3600); // 1 hour expiry
+
+    if (data) {
+      data.forEach((item) => {
+        if (item.path && item.signedUrl) {
+          urlMap.set(item.path, item.signedUrl);
+        }
+      });
+    }
+  } catch (err) {
+    console.warn("Batch createSignedUrls error:", err);
+  }
+
+  return urlMap;
+}
+
+/** Helper to map raw Supabase row + relations to application Memory model synchronously */
+function mapRowToMemorySync(
+  row: SupabaseMemoryRow,
+  attachmentUrl?: string
+): Memory {
   const tags: string[] = Array.isArray(row.memory_tags)
     ? row.memory_tags
         .map((mt) => mt.tags?.name)
@@ -62,22 +87,6 @@ async function mapRowToMemory(
         .map((sm) => sm.session_id)
         .filter((id): id is string => typeof id === "string")
     : [];
-
-  let attachmentUrl: string | undefined = undefined;
-
-  // Resolve short-lived signed URL for private attachments
-  if (row.attachment_path) {
-    try {
-      const { data } = await supabase.storage
-        .from(STORAGE_BUCKET)
-        .createSignedUrl(row.attachment_path, 3600); // 1 hour expiry
-      if (data?.signedUrl) {
-        attachmentUrl = data.signedUrl;
-      }
-    } catch (err) {
-      console.warn('Failed to resolve signed URL for attachment:', err);
-    }
-  }
 
   return {
     id: row.id,
@@ -116,7 +125,7 @@ function mapRowToSession(row: SupabaseSessionRow): Session {
 
 /**
  * Fetch all memories for the authenticated user from Supabase PostgreSQL.
- * Enforces user_id equality alongside RLS.
+ * Uses batched URL signing for attachments.
  */
 export async function getMemories(): Promise<Memory[]> {
   const user = await getCurrentUser();
@@ -138,20 +147,23 @@ export async function getMemories(): Promise<Memory[]> {
     .order("created_at", { ascending: false });
 
   if (error || !data) {
-    console.error("getMemories query error:", error);
+    console.error("Error fetching memories from Supabase:", error);
     return [];
   }
 
   const rows = data as unknown as SupabaseMemoryRow[];
-  return Promise.all(rows.map((row) => mapRowToMemory(supabase, row)));
+  const attachmentPaths = rows.map((r) => r.attachment_path).filter((p): p is string => Boolean(p));
+  const signedUrlMap = await resolveSignedUrlMap(supabase, attachmentPaths);
+
+  return rows.map((row) => {
+    const attachmentUrl = row.attachment_path ? signedUrlMap.get(row.attachment_path) : undefined;
+    return mapRowToMemorySync(row, attachmentUrl);
+  });
 }
 
-/**
- * Fetch a single memory by ID for the authenticated user.
- */
 export async function getMemoryById(id: string): Promise<Memory | undefined> {
   const user = await getCurrentUser();
-  if (!user || !id) return undefined;
+  if (!user) return undefined;
 
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -167,20 +179,162 @@ export async function getMemoryById(id: string): Promise<Memory | undefined> {
     `)
     .eq("id", id)
     .eq("user_id", user.id)
-    .maybeSingle();
+    .single();
 
   if (error || !data) {
-    if (error) console.error("getMemoryById query error:", error);
     return undefined;
   }
 
-  return mapRowToMemory(supabase, data as unknown as SupabaseMemoryRow);
+  const row = data as unknown as SupabaseMemoryRow;
+  const attachmentPaths = row.attachment_path ? [row.attachment_path] : [];
+  const signedUrlMap = await resolveSignedUrlMap(supabase, attachmentPaths);
+  const attachmentUrl = row.attachment_path ? signedUrlMap.get(row.attachment_path) : undefined;
+
+  return mapRowToMemorySync(row, attachmentUrl);
 }
 
-/**
- * Fetch N recent memories for the authenticated user.
- */
-export async function getRecentMemories(limit = 6): Promise<Memory[]> {
+export async function getSessions(): Promise<Session[]> {
+  const user = await getCurrentUser();
+  if (!user) return [];
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("sessions")
+    .select(`
+      *,
+      session_memories (
+        memory_id
+      )
+    `)
+    .eq("user_id", user.id)
+    .order("updated_at", { ascending: false });
+
+  if (error || !data) {
+    console.error("Error fetching sessions from Supabase:", error);
+    return [];
+  }
+
+  const rows = data as unknown as SupabaseSessionRow[];
+  return rows.map(mapRowToSession);
+}
+
+export async function getSessionById(id: string): Promise<Session | undefined> {
+  const user = await getCurrentUser();
+  if (!user) return undefined;
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("sessions")
+    .select(`
+      *,
+      session_memories (
+        memory_id
+      )
+    `)
+    .eq("id", id)
+    .eq("user_id", user.id)
+    .single();
+
+  if (error || !data) {
+    return undefined;
+  }
+
+  const row = data as unknown as SupabaseSessionRow;
+  return mapRowToSession(row);
+}
+
+export async function getMemoriesBySessionId(sessionId: string): Promise<Memory[]> {
+  const user = await getCurrentUser();
+  if (!user) return [];
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("session_memories")
+    .select(`
+      memory_id,
+      memories!inner (
+        *,
+        memory_tags (
+          tags ( name )
+        ),
+        session_memories (
+          session_id
+        )
+      )
+    `)
+    .eq("session_id", sessionId)
+    .eq("memories.user_id", user.id);
+
+  if (error || !data) {
+    return [];
+  }
+
+  interface SessionMemoryJoinRow {
+    memory_id: string;
+    memories: SupabaseMemoryRow;
+  }
+
+  const rows = (data as unknown as SessionMemoryJoinRow[]).map((r) => r.memories);
+  const attachmentPaths = rows.map((r) => r.attachment_path).filter((p): p is string => Boolean(p));
+  const signedUrlMap = await resolveSignedUrlMap(supabase, attachmentPaths);
+
+  return rows.map((row) => {
+    const attachmentUrl = row.attachment_path ? signedUrlMap.get(row.attachment_path) : undefined;
+    return mapRowToMemorySync(row, attachmentUrl);
+  });
+}
+
+export const getMemoriesForSession = getMemoriesBySessionId;
+
+export async function getSessionsByMemoryId(memoryId: string): Promise<Session[]> {
+  const user = await getCurrentUser();
+  if (!user) return [];
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("session_memories")
+    .select(`
+      session_id,
+      sessions!inner (
+        *,
+        session_memories (
+          memory_id
+        )
+      )
+    `)
+    .eq("memory_id", memoryId)
+    .eq("sessions.user_id", user.id);
+
+  if (error || !data) {
+    return [];
+  }
+
+  interface MemorySessionJoinRow {
+    session_id: string;
+    sessions: SupabaseSessionRow;
+  }
+
+  const rows = (data as unknown as MemorySessionJoinRow[]).map((r) => r.sessions);
+  return rows.map(mapRowToSession);
+}
+
+export const getSessionsForMemory = getSessionsByMemoryId;
+
+export async function getCollections(): Promise<string[]> {
+  const memories = await getMemories();
+  const collections = memories
+    .map((m) => m.collection)
+    .filter((c): c is string => typeof c === "string" && c.trim().length > 0);
+  return Array.from(new Set(collections));
+}
+
+export async function getTags(): Promise<string[]> {
+  const memories = await getMemories();
+  const tags = memories.flatMap((m) => m.tags);
+  return Array.from(new Set(tags));
+}
+
+export async function getRecentMemories(limit = 5): Promise<Memory[]> {
   const user = await getCurrentUser();
   if (!user) return [];
 
@@ -201,187 +355,20 @@ export async function getRecentMemories(limit = 6): Promise<Memory[]> {
     .limit(limit);
 
   if (error || !data) {
-    console.error("getRecentMemories query error:", error);
     return [];
   }
 
   const rows = data as unknown as SupabaseMemoryRow[];
-  return Promise.all(rows.map((row) => mapRowToMemory(supabase, row)));
+  const attachmentPaths = rows.map((r) => r.attachment_path).filter((p): p is string => Boolean(p));
+  const signedUrlMap = await resolveSignedUrlMap(supabase, attachmentPaths);
+
+  return rows.map((row) => {
+    const attachmentUrl = row.attachment_path ? signedUrlMap.get(row.attachment_path) : undefined;
+    return mapRowToMemorySync(row, attachmentUrl);
+  });
 }
 
-/**
- * Fetch memories attached to a specific session.
- */
-export async function getMemoriesForSession(sessionId: string): Promise<Memory[]> {
-  const user = await getCurrentUser();
-  if (!user || !sessionId) return [];
-
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("session_memories")
-    .select(`
-      memory_id,
-      memories (
-        *,
-        memory_tags (
-          tags ( name )
-        ),
-        session_memories (
-          session_id
-        )
-      )
-    `)
-    .eq("session_id", sessionId);
-
-  if (error || !data) {
-    if (error) console.error("getMemoriesForSession query error:", error);
-    return [];
-  }
-
-  const memoryRows = data
-    .map((item: { memories: unknown }) => item.memories)
-    .filter(Boolean) as SupabaseMemoryRow[];
-
-  return Promise.all(memoryRows.map((row) => mapRowToMemory(supabase, row)));
-}
-
-/**
- * Fetch sessions associated with a specific memory.
- */
-export async function getSessionsForMemory(memoryId: string): Promise<Session[]> {
-  const user = await getCurrentUser();
-  if (!user || !memoryId) return [];
-
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("session_memories")
-    .select(`
-      session_id,
-      sessions (
-        *,
-        session_memories (
-          memory_id
-        )
-      )
-    `)
-    .eq("memory_id", memoryId);
-
-  if (error || !data) {
-    if (error) console.error("getSessionsForMemory query error:", error);
-    return [];
-  }
-
-  const sessionRows = data
-    .map((item: { sessions: unknown }) => item.sessions)
-    .filter(Boolean) as SupabaseSessionRow[];
-
-  return sessionRows.map(mapRowToSession);
-}
-
-/**
- * Fetch distinct collections for the authenticated user.
- */
-export async function getCollections(): Promise<string[]> {
-  const user = await getCurrentUser();
-  if (!user) return [];
-
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("memories")
-    .select("collection")
-    .eq("user_id", user.id)
-    .not("collection", "is", null);
-
-  if (error || !data) {
-    return [];
-  }
-
-  const collections: string[] = Array.from(
-    new Set(
-      data
-        .map((row: { collection: string | null }) => row.collection)
-        .filter((col: string | null): col is string => Boolean(col && col.trim()))
-    )
-  );
-
-  return collections;
-}
-
-/**
- * Fetch distinct tags for the authenticated user.
- */
-export async function getTags(): Promise<string[]> {
-  const user = await getCurrentUser();
-  if (!user) return [];
-
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("tags")
-    .select("name")
-    .eq("user_id", user.id);
-
-  if (error || !data) {
-    return [];
-  }
-
-  return data.map((t: { name: string }) => t.name);
-}
-
-// -----------------------------------------------------------------------------
-// Session Data Access Layer (Supabase PostgreSQL backed)
-// -----------------------------------------------------------------------------
-
-export async function getSessions(): Promise<Session[]> {
-  const user = await getCurrentUser();
-  if (!user) return [];
-
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("sessions")
-    .select(`
-      *,
-      session_memories (
-        memory_id
-      )
-    `)
-    .eq("user_id", user.id)
-    .order("updated_at", { ascending: false });
-
-  if (error || !data) {
-    console.error("getSessions query error:", error);
-    return [];
-  }
-
-  const rows = data as unknown as SupabaseSessionRow[];
-  return rows.map(mapRowToSession);
-}
-
-export async function getSessionById(id: string): Promise<Session | undefined> {
-  const user = await getCurrentUser();
-  if (!user || !id) return undefined;
-
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("sessions")
-    .select(`
-      *,
-      session_memories (
-        memory_id
-      )
-    `)
-    .eq("id", id)
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  if (error || !data) {
-    if (error) console.error("getSessionById query error:", error);
-    return undefined;
-  }
-
-  return mapRowToSession(data as unknown as SupabaseSessionRow);
-}
-
-export async function getActiveSessions(): Promise<Session[]> {
+export async function getUnfinishedSessions(limit = 5): Promise<Session[]> {
   const user = await getCurrentUser();
   if (!user) return [];
 
@@ -396,40 +383,10 @@ export async function getActiveSessions(): Promise<Session[]> {
     `)
     .eq("user_id", user.id)
     .in("status", ["active", "paused"])
-    .order("updated_at", { ascending: false });
+    .order("updated_at", { ascending: false })
+    .limit(limit * 2);
 
   if (error || !data) {
-    console.error("getActiveSessions query error:", error);
-    return [];
-  }
-
-  const rows = data as unknown as SupabaseSessionRow[];
-  return rows.map(mapRowToSession);
-}
-
-/**
- * Fetch recent unfinished sessions for 'Continue Working' section on Dashboard.
- * Prioritizes 'active' sessions first, followed by 'paused' sessions, ordered by updated_at desc.
- */
-export async function getUnfinishedSessions(limit = 4): Promise<Session[]> {
-  const user = await getCurrentUser();
-  if (!user) return [];
-
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("sessions")
-    .select(`
-      *,
-      session_memories (
-        memory_id
-      )
-    `)
-    .eq("user_id", user.id)
-    .in("status", ["active", "paused"])
-    .order("updated_at", { ascending: false });
-
-  if (error || !data) {
-    console.error("getUnfinishedSessions query error:", error);
     return [];
   }
 
@@ -464,7 +421,6 @@ export async function getRecentSessions(limit = 5): Promise<Session[]> {
     .limit(limit);
 
   if (error || !data) {
-    console.error("getRecentSessions query error:", error);
     return [];
   }
 
@@ -483,19 +439,57 @@ export async function getActivityStats(): Promise<ActivityStats> {
     };
   }
 
-  const memories = await getMemories();
-  const sessions = await getSessions();
+  const supabase = await createClient();
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+  const [
+    memoriesThisWeekRes,
+    sessionsThisWeekRes,
+    totalMemoriesRes,
+    totalSessionsRes,
+  ] = await Promise.all([
+    supabase
+      .from("memories")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .gte("created_at", sevenDaysAgo),
+    supabase
+      .from("sessions")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .gte("created_at", sevenDaysAgo),
+    supabase
+      .from("memories")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id),
+    supabase
+      .from("sessions")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id),
+  ]);
 
   return {
-    memoriesThisWeek: memories.length,
-    sessionsThisWeek: sessions.length,
-    totalMemories: memories.length,
-    totalSessions: sessions.length,
+    memoriesThisWeek: memoriesThisWeekRes.count || 0,
+    sessionsThisWeek: sessionsThisWeekRes.count || 0,
+    totalMemories: totalMemoriesRes.count || 0,
+    totalSessions: totalSessionsRes.count || 0,
   };
 }
 
+/** Real query for uncategorized memories (Inbox count) */
 export async function getInboxCount(): Promise<number> {
-  return mockInboxCount;
+  const user = await getCurrentUser();
+  if (!user) return 0;
+
+  const supabase = await createClient();
+  const { count, error } = await supabase
+    .from("memories")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", user.id)
+    .is("collection", null);
+
+  if (error || count === null) return 0;
+  return count;
 }
 
 export async function getTimelineEvents(): Promise<TimelineEvent[]> {

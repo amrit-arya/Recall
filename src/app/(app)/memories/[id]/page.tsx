@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import type { Session } from "@/types";
 import Link from "next/link";
 import Image from "next/image";
 import { notFound } from "next/navigation";
@@ -173,7 +174,7 @@ export default async function MemoryDetailPage({ params }: MemoryDetailPageProps
             <p className="text-xs text-muted-foreground italic">No work sessions attached to this memory yet.</p>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {associatedSessions.map((session) => (
+              {associatedSessions.map((session: Session) => (
                 <SessionCard key={session.id} session={session} />
               ))}
             </div>

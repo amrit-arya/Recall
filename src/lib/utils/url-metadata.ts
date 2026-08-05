@@ -28,7 +28,7 @@ function decodeHtmlEntities(str: string): string {
     .trim()
 }
 
-/** Helper to resolve relative icon URLs against base origin */
+/** Helper to resolve relative icon/redirect URLs against base origin */
 function resolveUrl(href: string, base: string): string {
   try {
     return new URL(href, base).href
@@ -49,25 +49,62 @@ export async function fetchUrlMetadata(inputUrl: string): Promise<UrlMetadataRes
   const fallbackFavicon = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=64`
 
   try {
-    // 4-second sensible timeout
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 4000)
+    let currentUrl = canonicalUrl
+    let hops = 0
+    const maxHops = 3
+    let response: Response | null = null
 
-    const response = await fetch(canonicalUrl, {
-      method: 'GET',
-      headers: {
-        'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        Accept: 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.9',
-      },
-      signal: controller.signal,
-      redirect: 'follow',
-    })
+    // Manual redirect follow loop with per-hop SSRF validation
+    while (hops <= maxHops) {
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 4000)
 
-    clearTimeout(timeoutId)
+      const res = await fetch(currentUrl, {
+        method: 'GET',
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          Accept: 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9',
+        },
+        signal: controller.signal,
+        redirect: 'manual',
+      })
 
-    if (!response.ok) {
+      clearTimeout(timeoutId)
+
+      // Handle HTTP redirects (301, 302, 303, 307, 308)
+      if ([301, 302, 303, 307, 308].includes(res.status)) {
+        const location = res.headers.get('location')
+        if (!location || hops >= maxHops) {
+          break
+        }
+        const resolvedLocation = resolveUrl(location, currentUrl)
+        const redirectSafety = isSafePublicUrl(resolvedLocation)
+
+        // Re-validate every redirect hop against SSRF rules
+        if (!redirectSafety.safe || !redirectSafety.url) {
+          console.warn(`SSRF Security: Blocked redirect hop to unsafe target: ${resolvedLocation}`)
+          return {
+            success: true,
+            metadata: {
+              domain,
+              canonicalUrl,
+              faviconUrl: fallbackFavicon,
+            },
+          }
+        }
+
+        currentUrl = redirectSafety.url.href
+        hops++
+        continue
+      }
+
+      response = res
+      break
+    }
+
+    if (!response || !response.ok) {
       return {
         success: true,
         metadata: {

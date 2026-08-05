@@ -2,7 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { getCurrentUser } from '@/lib/supabase/auth'
-import { STORAGE_BUCKET } from '@/lib/supabase/storage'
+import { resolveSignedUrlMap } from '@/lib/data'
 import type { Memory, Session, MemoryType, SessionStatus } from '@/types'
 
 export type SearchFilterType = 'all' | 'memories' | 'sessions'
@@ -41,7 +41,7 @@ interface RawTagMemoryJoin {
   memories: RawMemoryRow | null
 }
 
-/** Sanitize query input for safe ILIKE pattern matching */
+/** Sanitize query input for safe ILIKE pattern matching & PostgREST filter string protection */
 function sanitizeSearchQuery(query: string): string {
   return query
     .trim()
@@ -49,6 +49,9 @@ function sanitizeSearchQuery(query: string): string {
     .replace(/\\/g, '\\\\')
     .replace(/%/g, '\\%')
     .replace(/_/g, '\\_')
+    .replace(/,/g, '')
+    .replace(/\(/g, '')
+    .replace(/\)/g, '')
 }
 
 export async function searchUniversalAction(
@@ -69,7 +72,15 @@ export async function searchUniversalAction(
       }
     }
 
-    const safePattern = `%${sanitizeSearchQuery(cleanQuery)}%`
+    const sanitizedPattern = sanitizeSearchQuery(cleanQuery)
+    if (!sanitizedPattern) {
+      return {
+        success: true,
+        data: { memories: [], sessions: [], totalCount: 0 },
+      }
+    }
+
+    const safePattern = `%${sanitizedPattern}%`
     const supabase = await createClient()
 
     let matchedMemories: Memory[] = []
@@ -146,49 +157,44 @@ export async function searchUniversalAction(
         return 0
       })
 
-      // Resolve signed URLs for memories
-      matchedMemories = await Promise.all(
-        allMatchedRows.map(async (row) => {
-          const tags: string[] = Array.isArray(row.memory_tags)
-            ? row.memory_tags
-                .map((mt) => mt.tags?.name)
-                .filter((name): name is string => typeof name === 'string')
-            : []
+      // Batch resolve signed URLs for search results
+      const attachmentPaths = allMatchedRows
+        .map((r) => r.attachment_path)
+        .filter((p): p is string => Boolean(p))
+      const signedUrlMap = await resolveSignedUrlMap(supabase, attachmentPaths)
 
-          const sessionIds: string[] = Array.isArray(row.session_memories)
-            ? row.session_memories
-                .map((sm) => sm.session_id)
-                .filter((id): id is string => typeof id === 'string')
-            : []
+      matchedMemories = allMatchedRows.map((row) => {
+        const tags: string[] = Array.isArray(row.memory_tags)
+          ? row.memory_tags
+              .map((mt) => mt.tags?.name)
+              .filter((name): name is string => typeof name === 'string')
+          : []
 
-          let attachmentUrl: string | undefined = undefined
-          if (row.attachment_path) {
-            try {
-              const { data } = await supabase.storage
-                .from(STORAGE_BUCKET)
-                .createSignedUrl(row.attachment_path, 3600)
-              attachmentUrl = data?.signedUrl || undefined
-            } catch (err) {
-              console.warn('Signed URL resolution error during search:', err)
-            }
-          }
+        const sessionIds: string[] = Array.isArray(row.session_memories)
+          ? row.session_memories
+              .map((sm) => sm.session_id)
+              .filter((id): id is string => typeof id === 'string')
+          : []
 
-          return {
-            id: row.id,
-            title: row.title,
-            content: row.content || undefined,
-            url: row.url || undefined,
-            type: row.type,
-            description: row.description || undefined,
-            aiSummary: row.ai_summary || undefined,
-            collection: row.collection || undefined,
-            attachmentUrl,
-            createdAt: row.created_at,
-            tags,
-            sessionIds,
-          }
-        })
-      )
+        const attachmentUrl = row.attachment_path
+          ? signedUrlMap.get(row.attachment_path)
+          : undefined
+
+        return {
+          id: row.id,
+          title: row.title,
+          content: row.content || undefined,
+          url: row.url || undefined,
+          type: row.type,
+          description: row.description || undefined,
+          aiSummary: row.ai_summary || undefined,
+          collection: row.collection || undefined,
+          attachmentUrl,
+          createdAt: row.created_at,
+          tags,
+          sessionIds,
+        }
+      })
     }
 
     // 2. Search Sessions
