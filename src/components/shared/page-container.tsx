@@ -17,14 +17,14 @@ export function PageContainer({
 }: PageContainerProps) {
   return (
     <div className={cn("flex-1 overflow-y-auto min-w-0", className)}>
-      <div className="mx-auto w-full max-w-6xl px-3.5 py-4 sm:px-6 lg:px-8">
-        <div className="mb-4 sm:mb-6 flex flex-col sm:flex-row sm:items-start justify-between gap-2 sm:gap-4">
+      <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
+        <div className="mb-6 flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground">
               {title}
             </h1>
             {description && (
-              <p className="mt-0.5 text-xs sm:text-sm text-muted-foreground">
+              <p className="mt-1 text-sm text-muted-foreground">
                 {description}
               </p>
             )}
