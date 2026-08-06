@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { createClient as createBrowserClient } from '@/lib/supabase/client'
+import { createClient as createBrowserClient, isSupabaseConfigured } from '@/lib/supabase/client'
 import { UserPlus, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react'
 
 export default function RegisterPage() {
@@ -22,6 +22,13 @@ export default function RegisterPage() {
     e.preventDefault()
     setError(null)
     setSuccessMessage(null)
+
+    if (!isSupabaseConfigured()) {
+      setError(
+        'Supabase environment variables (NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY) are missing in Vercel project settings.'
+      )
+      return
+    }
 
     if (!email.trim() || !password) {
       setError('Please fill in all required fields.')
@@ -61,7 +68,7 @@ export default function RegisterPage() {
       }
 
       if (data.user) {
-        // 2. Only upsert profile if active session exists (L2 Fix)
+        // 2. Only upsert profile if active session exists
         if (data.session) {
           const { error: profileError } = await supabase
             .from('profiles')
@@ -78,7 +85,7 @@ export default function RegisterPage() {
           router.refresh()
           return
         } else {
-          // Email confirmation is required (unauthenticated until confirmed)
+          // Email confirmation is required
           setSuccessMessage(
             'Account created successfully! Please check your email to confirm your account before logging in.'
           )
@@ -92,18 +99,11 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="rounded-2xl border border-border bg-card p-6 sm:p-8 shadow-sm space-y-6">
-      <div className="space-y-2 text-center">
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">Create your Account</h1>
-        <p className="text-sm text-muted-foreground">
-          Start capturing your digital memories and work context with RECALL
-        </p>
-      </div>
-
+    <div className="rounded-xl border border-border/60 bg-card p-6 shadow-xs space-y-5">
       {error && (
         <div className="flex items-start gap-3 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-600 dark:text-red-400">
           <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-          <div className="flex-1">{error}</div>
+          <div className="flex-1 leading-relaxed">{error}</div>
         </div>
       )}
 
@@ -127,7 +127,7 @@ export default function RegisterPage() {
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
               disabled={loading}
-              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50"
+              className="w-full rounded-lg border border-border/60 bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50"
             />
           </div>
 
@@ -144,7 +144,7 @@ export default function RegisterPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               disabled={loading}
-              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50"
+              className="w-full rounded-lg border border-border/60 bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50"
             />
           </div>
 
@@ -161,7 +161,7 @@ export default function RegisterPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               disabled={loading}
-              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50"
+              className="w-full rounded-lg border border-border/60 bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50"
             />
           </div>
 
@@ -178,14 +178,14 @@ export default function RegisterPage() {
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               disabled={loading}
-              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50"
+              className="w-full rounded-lg border border-border/60 bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50"
             />
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50 transition-colors cursor-pointer"
+            className="w-full flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50 transition-all cursor-pointer shadow-xs"
           >
             {loading ? (
               <>
@@ -202,9 +202,9 @@ export default function RegisterPage() {
         </form>
       )}
 
-      <div className="text-center text-xs text-muted-foreground pt-2 border-t border-border">
+      <div className="text-center text-xs text-muted-foreground pt-3 border-t border-border/40">
         Already have an account?{' '}
-        <Link href="/login" className="font-medium text-primary hover:underline">
+        <Link href="/login" className="font-semibold text-primary hover:underline">
           Sign in
         </Link>
       </div>

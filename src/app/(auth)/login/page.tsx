@@ -3,7 +3,7 @@
 import { useState, Suspense } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { createClient as createBrowserClient } from '@/lib/supabase/client'
+import { createClient as createBrowserClient, isSupabaseConfigured } from '@/lib/supabase/client'
 import { getSafeRedirect } from '@/lib/utils/redirect'
 import { LogIn, Loader2, AlertCircle } from 'lucide-react'
 
@@ -22,6 +22,13 @@ function LoginForm() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
+
+    if (!isSupabaseConfigured()) {
+      setError(
+        'Supabase environment variables (NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY) are missing in Vercel project settings.'
+      )
+      return
+    }
 
     if (!email.trim() || !password) {
       setError('Please enter both email and password.')
@@ -56,18 +63,11 @@ function LoginForm() {
   }
 
   return (
-    <div className="rounded-2xl border border-border bg-card p-6 sm:p-8 shadow-sm space-y-6">
-      <div className="space-y-2 text-center">
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">Welcome Back</h1>
-        <p className="text-sm text-muted-foreground">
-          Sign in to your RECALL account to access your digital memories and work context
-        </p>
-      </div>
-
+    <div className="rounded-xl border border-border/60 bg-card p-6 shadow-xs space-y-5">
       {error && (
         <div className="flex items-start gap-3 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-600 dark:text-red-400">
           <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-          <div className="flex-1">{error}</div>
+          <div className="flex-1 leading-relaxed">{error}</div>
         </div>
       )}
 
@@ -85,7 +85,7 @@ function LoginForm() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             disabled={loading}
-            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50"
+            className="w-full rounded-lg border border-border/60 bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50"
           />
         </div>
 
@@ -104,14 +104,14 @@ function LoginForm() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             disabled={loading}
-            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50"
+            className="w-full rounded-lg border border-border/60 bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50"
           />
         </div>
 
         <button
           type="submit"
           disabled={loading}
-          className="w-full flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50 transition-colors cursor-pointer"
+          className="w-full flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50 transition-all cursor-pointer shadow-xs"
         >
           {loading ? (
             <>
@@ -121,15 +121,15 @@ function LoginForm() {
           ) : (
             <>
               <LogIn className="h-4 w-4" />
-              <span>Sign In</span>
+              <span>Continue</span>
             </>
           )}
         </button>
       </form>
 
-      <div className="text-center text-xs text-muted-foreground pt-2 border-t border-border">
+      <div className="text-center text-xs text-muted-foreground pt-3 border-t border-border/40">
         Don&apos;t have an account?{' '}
-        <Link href="/register" className="font-medium text-primary hover:underline">
+        <Link href="/register" className="font-semibold text-primary hover:underline">
           Create an account
         </Link>
       </div>
@@ -140,7 +140,7 @@ function LoginForm() {
 export default function LoginPage() {
   return (
     <Suspense fallback={
-      <div className="rounded-2xl border border-border bg-card p-8 text-center text-sm text-muted-foreground">
+      <div className="rounded-xl border border-border/60 bg-card p-6 text-center text-xs text-muted-foreground">
         Loading...
       </div>
     }>
